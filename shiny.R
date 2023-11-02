@@ -14,18 +14,42 @@ excel_numeric_to_date <- function(numeric_date) {
 }
 
 # UI Part
-ui <- fluidPage(
-  titlePanel("Upload and Download Data"),
-  sidebarLayout(
-    sidebarPanel(
-      fileInput("file1", "Choose CSV File"),
-      downloadButton("downloadData", "Download XLSX")
-    ),
-    mainPanel(
-      dataTableOutput("viewData") 
-    )
-  )
+ui <- shiny::navbarPage("Order Late Acknowledgement",
+                        tags$head(
+                          tags$style(HTML("
+                            #custom-logo {
+                              position: fixed;
+                              right: 10px;
+                              bottom: 10px;
+                              z-index: 100;
+                            }
+                          "))
+                        ),
+                        tabPanel("Upload Data",
+                                 sidebarLayout(
+                                   sidebarPanel(
+                                     fileInput("file1", "Choose CSV File"),
+                                     downloadButton("downloadData", "Download Cleaned .xlsx file")
+                                   ),
+                                   mainPanel(
+                                     img(src = "as400.png", height = 700, width = 1200),
+                                     tags$br(),  # Line break
+                                     tags$br(),  # Additional line break
+                                     tags$br(),  # Additional line break
+                                     tags$p("If you'd like to view data for a different date range, please feel free to upload your own AS400 data (2269)",
+                                            style = "font-size: 18px; font-weight: bold;") # CSS styling for bigger and bold text
+                                   )
+                                 )),
+                        tabPanel("View Data",
+                                 fluidRow(
+                                   column(width = 12, 
+                                          dataTableOutput("viewData"))
+                                 )),
+                        absolutePanel(id = "custom-logo", 
+                                      img(src = "VenturaFoodsLogo.png", height = 60, width = 300)) # Adjust height and width as needed
 )
+
+
 
 # Server logic
 server <- function(input, output) {
@@ -95,10 +119,18 @@ server <- function(input, output) {
   )
   
   output$viewData <- renderDataTable({
-    datatable(data_to_download(), extensions = 'Buttons', options = list(
-      dom = 'Bfrtip',
-      buttons = c('copy', 'excel')
-    ))
+    datatable(data_to_download(), extensions = 'Buttons', 
+              options = list(
+                pageLength = 100,
+                scrollX = TRUE,
+                scrollY = "600px",  # set a fixed height for vertical scrolling
+                dom = "Blfrtip",
+                buttons = c("copy", "csv", "excel"),
+                fixedColumns = list(leftColumns = 2),
+                searchDelay = 500
+              ),
+              filter = 'top' # This adds the filter input on top of each column
+    )
   })
 }
 
