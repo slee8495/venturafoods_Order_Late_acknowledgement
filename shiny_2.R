@@ -82,9 +82,9 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                    column(width = 12, 
                                           rpivotTableOutput("pivot3")
                                    ),
-                                   div(style = "position: absolute; top: 590px; right: 1150px;", 
+                                   div(style = "position: absolute; top: 590px; right: 1250px;", 
                                        tags$p("Please ensure that you unselect \"E\" from the \"Order ack\" option in the left panel", 
-                                              style = "font-size: 11px; font-weight: bold; color: blue;")
+                                              style = "font-size: 9px; font-weight: bold; color: blue;")
                                    ),
 
                                  )
@@ -92,8 +92,8 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         
                         tabPanel("Overall Process Summary",
                                  tabsetPanel(
-                                   tabPanel("Pie Chart",
-                                            selectInput("week_number", "Select Week Number:", c("All", unique(cleaned_default_data$`Week Number`)), selected = "All"),
+                                   tabPanel("Fail Distribution - Pie Chart",
+                                            selectInput("Week", "Select Week Number:", unique(cleaned_default_data$Week), multiple = TRUE),
                                             plotOutput("pieChart")
                                    ),
                                    tabPanel("Stacked Bar Chart",
@@ -140,9 +140,9 @@ server <- function(input, output, session) {
   
   output$pivot <- renderRpivotTable({
     rpivotTable(data = data_to_display(), 
-                rows = "Customer name", 
+                rows = "CustomerName", 
                 cols = "Fail", 
-                vals = "Customer name", 
+                vals = "CustomerName", 
                 aggregatorName = "Count as Fraction of Rows", 
                 rendererName = "Table", 
                 width="100%", 
@@ -152,7 +152,7 @@ server <- function(input, output, session) {
   output$pivot1 <- renderRpivotTable({
     rpivotTable(data = data_to_display(),
                 rows = "Profile name",
-                vals = "Customer name",
+                vals = "CustomerName",
                 aggregatorName = "Count",
                 rendererName = "Table",
                 width="100%",
@@ -162,7 +162,7 @@ server <- function(input, output, session) {
   output$barplot <- renderRpivotTable({
     rpivotTable(data = data_to_display(),
                 cols = "Profile name",
-                vals = "Customer name",
+                vals = "CustomerName",
                 aggregatorName = "Count",
                 rendererName = "Bar Chart",
                 width="100%",
@@ -173,7 +173,7 @@ server <- function(input, output, session) {
     rpivotTable(data = data_to_display(),
                 rows = "Profile name",
                 cols = "Fail",
-                vals = "Customer name",
+                vals = "CustomerName",
                 aggregatorName = "Count",
                 rendererName = "Table",
                 width="100%",
@@ -184,7 +184,7 @@ server <- function(input, output, session) {
     rpivotTable(data = data_to_display(),
                 rows = "Fail",
                 cols = "Profile name",
-                vals = "Customer name",
+                vals = "CustomerName",
                 aggregatorName = "Count",
                 rendererName = "Stacked Bar Chart",
                 width="100%",
@@ -204,14 +204,14 @@ server <- function(input, output, session) {
   
   output$pieChart <- renderPlot({
     pie_data <- data_to_display() %>% 
-      dplyr::filter(`Week Number` == input$week_number | is.null(input$week_number)) %>% 
+      dplyr::filter(Week == input$Week | is.null(input$Week)) %>% 
       group_by(Fail) %>% 
-      summarise(Count = n_distinct(`Customer name`))
+      summarise(Count = n_distinct(`CustomerName`))
     
     ggplot2::ggplot(pie_data, ggplot2::aes(x = "", y = Count, fill = Fail)) +
       ggplot2::geom_bar(stat = "identity", width = 1) +
       ggplot2::coord_polar(theta = "y") +
-      ggplot2::labs(fill = "Fail", title = paste("Fail Distribution for Week", input$week_number)) +
+      ggplot2::labs(fill = "Fail", title = paste("Fail Distribution")) +
       ggplot2::geom_text(aes(label = scales::percent(Count/sum(Count))), position = position_stack(vjust = 0.5), size = 5, fontface = "bold") + 
       ggplot2::theme_minimal() +
       ggplot2::theme(axis.title.x=element_blank(),
@@ -226,20 +226,33 @@ server <- function(input, output, session) {
   
   output$stackedBar <- renderPlot({
     bar_data <- data_to_display() %>%
-      dplyr::filter(!is.na("Week Number")) %>%
-      group_by("Week Number") %>%
-      summarise(Count = n_distinct("Customer name"))
+      dplyr::filter(!is.na(Week)) %>%
+      group_by(Week, Fail) %>%
+      summarise(Count = n_distinct(`CustomerName`))
     
-    ggplot2::ggplot(bar_data, ggplot2::aes(x = "Week Number", y = Count, fill = Fail)) +
+    total_counts <- bar_data %>% group_by(WeekNumber) %>% summarise(Total = sum(Count))
+    
+    bar_data <- merge(bar_data, total_counts, by = "Week")
+    bar_data$Percentage <- bar_data$Count / bar_data$Total
+    
+    ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Count, fill = Fail)) +
       ggplot2::geom_bar(stat = "identity", position = "stack") +
-      ggplot2::theme_minimal()
+      ggplot2::geom_text(aes(label = scales::percent(Percentage), y = (cumsum(Count) - (0.5 * Count))), position = position_stack()) +
+      ggplot2::theme_minimal() +
+      ggplot2::theme(axis.title.x=element_blank(),
+                     axis.text.x=element_blank(),
+                     axis.ticks.x=element_blank(),
+                     axis.title.y=element_blank(),
+                     axis.text.y=element_blank(),
+                     axis.ticks.y=element_blank())
   })
+  
   
   output$lineGraph <- renderPlot({
     line_data <- data_to_display() %>%
       dplyr::filter(Fail == "Yes") %>%
       group_by("Order date") %>%
-      summarise(Count = n_distinct("Customer name"))
+      summarise(Count = n_distinct("CustomerName"))
     
     ggplot2::ggplot(line_data, ggplot2::aes(x = "Order date", y = Count)) +
       ggplot2::geom_line() +
@@ -248,7 +261,7 @@ server <- function(input, output, session) {
   
   output$avgGraph <- renderPlot({
     avg_data <- data_to_display() %>%
-      group_by("Order date", "Week Number", Fail) %>%
+      group_by("Order date", "Week", Fail) %>%
       summarise(Avg_Target = mean(Target, na.rm = TRUE),
                 Avg_Days_to_acknowledge = mean("Days to acknowledge", na.rm = TRUE))
     

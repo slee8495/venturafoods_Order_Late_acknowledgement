@@ -38,10 +38,10 @@ cleaned_data %>%
                 "Leader name" = leader_name,
                 Loc = loc,
                 Order = order,
-                "Customer name" = customer_name,
+                CustomerName = customer_name,
                 Customer = customer,
                 "Order date" = order_date,
-                "Week Number" = week_number,
+                Week = week_number,
                 "Delivery date" = delivery_date,
                 "Ship date" = ship_date,
                 "Detail hold code" = detail_hold_code,
@@ -88,10 +88,10 @@ clean_data <- function(raw_data_as400) {
                   "Leader name" = leader_name,
                   Loc = loc,
                   Order = order,
-                  "Customer name" = customer_name,
+                  CustomerName = customer_name,
                   Customer = customer,
                   "Order date" = order_date,
-                  "Week Number" = week_number,
+                  Week = week_number,
                   "Delivery date" = delivery_date,
                   "Ship date" = ship_date,
                   "Detail hold code" = detail_hold_code,
@@ -109,4 +109,3 @@ clean_data <- function(raw_data_as400) {
 raw_data_as400 <- read_csv("SUM348094.csv")
 cleaned_default_data <- clean_data(raw_data_as400)
 
-                
