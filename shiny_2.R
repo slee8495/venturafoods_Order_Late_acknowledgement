@@ -93,7 +93,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         tabPanel("Overall Process Summary",
                                  tabsetPanel(
                                    tabPanel("Fail Distribution - Pie Chart",
-                                            selectInput("Week", "Select Week Number:", unique(cleaned_default_data$Week), multiple = TRUE),
+                                            selectInput("Week", "Select Week Number:", unique(cleaned_default_data$Week), multiple = TRUE, selected = unique(cleaned_default_data$Week)),
                                             plotOutput("pieChart")
                                    ),
                                    tabPanel("Stacked Bar Chart",
@@ -103,7 +103,16 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             plotOutput("lineGraph")
                                    ),
                                    tabPanel("Order Date Average Graph",
+                                            selectInput("Week", "Select Week Number:", 
+                                                        choices = unique(cleaned_default_data$Week), 
+                                                        multiple = TRUE, 
+                                                        selected = unique(cleaned_default_data$Week)),
+                                            selectInput("Fail", "Select Fail Status:", 
+                                                        choices = unique(cleaned_default_data$Fail),
+                                                        selected = unique(cleaned_default_data$Fail),
+                                                        multiple = TRUE),
                                             plotOutput("avgGraph")
+                                   
                                    )
                                  )
                         )
@@ -263,36 +272,73 @@ server <- function(input, output, session) {
       )
   })
   
-  
-  
-  
-  
-  
-  
+
   
   output$lineGraph <- renderPlot({
     line_data <- data_to_display() %>%
-      dplyr::filter(Fail == "Yes") %>%
-      group_by("Order date") %>%
-      summarise(Count = n_distinct("CustomerName"))
+      group_by(`Order date`, Fail) %>%
+      summarise(Count = n_distinct(CustomerName)) %>%
+      ungroup()
     
-    ggplot2::ggplot(line_data, ggplot2::aes(x = "Order date", y = Count)) +
-      ggplot2::geom_line() +
-      ggplot2::theme_minimal()
+    # Convert Order date to factor
+    line_data$`Order date` <- factor(line_data$`Order date`, levels = unique(line_data$`Order date`))
+    
+    p <- ggplot2::ggplot(line_data, ggplot2::aes(x = `Order date`, y = Count, color = Fail, group = Fail)) +
+      ggplot2::geom_line(size = 1) +
+      ggplot2::geom_text(aes(label = Count), vjust = -0.5, size = 5, fontface = "bold") +  # making the text label larger and bold
+      ggplot2::theme_classic() +
+      ggplot2::labs(y = "Number of Customers", x = "Order Date", color = "Fail Status") +
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+        axis.text.y = ggplot2::element_text(size = 14, face = "bold"),
+        axis.title.x = ggplot2::element_text(size = 16, face = "bold"),
+        axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
+        legend.title = ggplot2::element_text(size = 16, face = "bold"),
+        legend.text = ggplot2::element_text(size = 14, face = "bold"),
+        legend.key.size = unit(1.5, "cm")  # Increase legend key size
+      )
+    print(p)
   })
   
   output$avgGraph <- renderPlot({
     avg_data <- data_to_display() %>%
-      group_by("Order date", "Week", Fail) %>%
-      summarise(Avg_Target = mean(Target, na.rm = TRUE),
-                Avg_Days_to_acknowledge = mean("Days to acknowledge", na.rm = TRUE))
+      dplyr::filter(Week %in% input$Week, Fail %in% input$Fail) %>%
+      dplyr::group_by(`Order date`) %>%
+      dplyr::summarise(
+        Avg_Target = mean(Target, na.rm = TRUE),
+        Avg_Days_to_acknowledge = mean(`Days to acknowledge`, na.rm = TRUE)
+      ) %>%
+      tidyr::gather(key = "Metric", value = "Value", Avg_Days_to_acknowledge)
     
-    ggplot2::ggplot(avg_data, ggplot2::aes(x = "Order date")) +
-      ggplot2::geom_line(ggplot2::aes(y = Avg_Target, color = "Average Target")) +
-      ggplot2::geom_line(ggplot2::aes(y = Avg_Days_to_acknowledge, color = "Average Days to Acknowledge")) +
-      ggplot2::theme_minimal() +
-      ggplot2::labs(color = "Metric")
+    # Convert Order date to factor
+    avg_data$`Order date` <- factor(avg_data$`Order date`, levels = unique(avg_data$`Order date`))
+    
+    last_date <- tail(levels(avg_data$`Order date`), 1)  # Get the last level of the factor
+    
+    p <- ggplot2::ggplot(avg_data, ggplot2::aes(x = `Order date`, y = Value, color = Metric, group = Metric)) +
+      ggplot2::geom_line(size = 1) +
+      ggplot2::geom_hline(yintercept = 2, linetype = "dashed", color = "blue", size = 1) +  # Adding a target line at y=2
+      ggplot2::geom_text(aes(label=sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  # Adding text labels for the plotted values, made larger and bold
+      ggplot2::annotate("text", x = last_date, y = 2.2, label = "Target", hjust = -1.9, color = "lightgreen", size = 6, fontface = "bold") +  # Making "Target" label larger and bold
+      ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  # Setting Y-axis to start from 0
+      ggplot2::theme_classic() +
+      ggplot2::labs(y = "Value", x = "Order Date", color = "Metric") +
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+        axis.text.y = ggplot2::element_text(size = 14, face = "bold"),
+        axis.title.x = ggplot2::element_text(size = 16, face = "bold"),
+        axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
+        legend.title = ggplot2::element_text(size = 16, face = "bold"),
+        legend.text = ggplot2::element_text(size = 14, face = "bold"),
+        legend.key.size = unit(1.5, "cm")  # Increase legend key size
+      )
+    print(p)
   })
+  
+  
+  
+  
+  
 }
 
 shinyApp(ui, server)
