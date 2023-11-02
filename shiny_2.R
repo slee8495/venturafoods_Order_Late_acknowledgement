@@ -74,7 +74,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             rpivotTableOutput("stackedbarplot")
                                    )
                                  )
-                        
+                                 
                                  
                         ),
                         tabPanel("Not Acknowledged",
@@ -86,7 +86,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                        tags$p("Please ensure that you unselect \"E\" from the \"Order ack\" option in the left panel", 
                                               style = "font-size: 9px; font-weight: bold; color: blue;")
                                    ),
-
+                                   
                                  )
                         ),
                         
@@ -112,16 +112,30 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                         selected = unique(cleaned_default_data$Fail),
                                                         multiple = TRUE),
                                             plotOutput("avgGraph")
-                                   
+                                            
                                    )
                                  )
                         )
-
+                        
+                        
 )
 
 # Server logic
 server <- function(input, output, session) {
+  
   data_to_display <- reactiveVal(cleaned_default_data)
+  
+  observeEvent(input$file1, {
+    # Check if a file is uploaded
+    if (!is.null(input$file1)) {
+      # Read uploaded file
+      uploaded_data <- readr::read_csv(input$file1$datapath)
+      # Clean the uploaded data using the `clean_data` function
+      cleaned_uploaded_data <- clean_data(uploaded_data)
+      # Update the reactive value
+      data_to_display(cleaned_uploaded_data)
+    }
+  })
   
   output$downloadData <- downloadHandler(
     filename = function() {
@@ -261,9 +275,9 @@ server <- function(input, output, session) {
     ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Percentage, fill = Fail)) +
       ggplot2::geom_bar(stat = "identity", position = "stack") +
       ggplot2::geom_text(aes(label = sprintf("%.1f%%", Percentage), y = CumulativePercentage), 
-                         size = 6, face = "bold", color = "blue") +
+                         size = 6, face = "bold", color = "black") +
       ggplot2::labs(y = "Percentage (%)", x = "Week", fill = "Fail") +
-      ggplot2::theme_minimal() +
+      ggplot2::theme_classic() +
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(face = "bold", size = 12),
         axis.text.y = ggplot2::element_text(face = "bold", size = 12),
@@ -272,7 +286,7 @@ server <- function(input, output, session) {
       )
   })
   
-
+  
   
   output$lineGraph <- renderPlot({
     line_data <- data_to_display() %>%
@@ -319,7 +333,7 @@ server <- function(input, output, session) {
       ggplot2::geom_line(size = 1) +
       ggplot2::geom_hline(yintercept = 2, linetype = "dashed", color = "blue", size = 1) +  # Adding a target line at y=2
       ggplot2::geom_text(aes(label=sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  # Adding text labels for the plotted values, made larger and bold
-      ggplot2::annotate("text", x = last_date, y = 2.2, label = "Target", hjust = -1.9, color = "lightgreen", size = 6, fontface = "bold") +  # Making "Target" label larger and bold
+      ggplot2::annotate("text", x = last_date, y = 2.2, label = "Target", hjust = -1.9, color = "black", size = 6, fontface = "bold") +  # Making "Target" label larger and bold
       ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  # Setting Y-axis to start from 0
       ggplot2::theme_classic() +
       ggplot2::labs(y = "Value", x = "Order Date", color = "Metric") +
@@ -334,8 +348,6 @@ server <- function(input, output, session) {
       )
     print(p)
   })
-  
-  
   
   
   
