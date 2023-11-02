@@ -228,24 +228,46 @@ server <- function(input, output, session) {
     bar_data <- data_to_display() %>%
       dplyr::filter(!is.na(Week)) %>%
       group_by(Week, Fail) %>%
-      summarise(Count = n_distinct(`CustomerName`))
+      summarise(Count = n_distinct(CustomerName)) %>%
+      ungroup() # Ungroup the data for further operations
     
-    total_counts <- bar_data %>% group_by(WeekNumber) %>% summarise(Total = sum(Count))
+    # Convert Week to a factor
+    bar_data$Week <- factor(bar_data$Week, levels = unique(bar_data$Week), ordered = TRUE)
     
+    # Calculate total counts for each week
+    total_counts <- bar_data %>% group_by(Week) %>% summarise(Total = sum(Count))
+    
+    # Merge total counts to bar_data
     bar_data <- merge(bar_data, total_counts, by = "Week")
-    bar_data$Percentage <- bar_data$Count / bar_data$Total
     
-    ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Count, fill = Fail)) +
+    # Calculate percentages
+    bar_data$Percentage <- (bar_data$Count / bar_data$Total) * 100
+    
+    # Calculate cumulative percentage
+    bar_data <- bar_data %>%
+      arrange(Week, desc(Fail)) %>%
+      group_by(Week) %>%
+      mutate(CumulativePercentage = cumsum(Percentage) - 0.5 * Percentage)
+    
+    ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Percentage, fill = Fail)) +
       ggplot2::geom_bar(stat = "identity", position = "stack") +
-      ggplot2::geom_text(aes(label = scales::percent(Percentage), y = (cumsum(Count) - (0.5 * Count))), position = position_stack()) +
+      ggplot2::geom_text(aes(label = sprintf("%.1f%%", Percentage), y = CumulativePercentage), 
+                         size = 6, face = "bold", color = "blue") +
+      ggplot2::labs(y = "Percentage (%)", x = "Week", fill = "Fail") +
       ggplot2::theme_minimal() +
-      ggplot2::theme(axis.title.x=element_blank(),
-                     axis.text.x=element_blank(),
-                     axis.ticks.x=element_blank(),
-                     axis.title.y=element_blank(),
-                     axis.text.y=element_blank(),
-                     axis.ticks.y=element_blank())
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(face = "bold", size = 12),
+        axis.text.y = ggplot2::element_text(face = "bold", size = 12),
+        axis.title.x = ggplot2::element_text(face = "bold", size = 14),
+        axis.title.y = ggplot2::element_text(face = "bold", size = 14)
+      )
   })
+  
+  
+  
+  
+  
+  
   
   
   output$lineGraph <- renderPlot({
