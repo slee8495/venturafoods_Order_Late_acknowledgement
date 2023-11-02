@@ -74,7 +74,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             rpivotTableOutput("stackedbarplot")
                                    )
                                  )
-                                 
+                        
                                  
                         ),
                         tabPanel("Not Acknowledged",
@@ -86,14 +86,14 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                        tags$p("Please ensure that you unselect \"E\" from the \"Order ack\" option in the left panel", 
                                               style = "font-size: 11px; font-weight: bold; color: blue;")
                                    ),
-                                   
+
                                  )
                         ),
                         
                         tabPanel("Overall Process Summary",
                                  tabsetPanel(
                                    tabPanel("Pie Chart",
-                                            selectInput("week_number", "Select Week Number:", unique(cleaned_default_data$`Week Number`), selected = NULL),
+                                            selectInput("week_number", "Select Week Number:", c("All", unique(cleaned_default_data$`Week Number`)), selected = "All"),
                                             plotOutput("pieChart")
                                    ),
                                    tabPanel("Stacked Bar Chart",
@@ -107,7 +107,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                    )
                                  )
                         )
-                        
+
 )
 
 # Server logic
@@ -204,7 +204,7 @@ server <- function(input, output, session) {
   
   output$pieChart <- renderPlot({
     pie_data <- data_to_display() %>% 
-      dplyr::filter(`Week Number` == input$week_number) %>% 
+      dplyr::filter(`Week Number` == input$week_number | is.null(input$week_number)) %>% 
       group_by(Fail) %>% 
       summarise(Count = n_distinct(`Customer name`))
     
@@ -212,14 +212,16 @@ server <- function(input, output, session) {
       ggplot2::geom_bar(stat = "identity", width = 1) +
       ggplot2::coord_polar(theta = "y") +
       ggplot2::labs(fill = "Fail", title = paste("Fail Distribution for Week", input$week_number)) +
-      ggplot2::geom_text(aes(label = scales::percent(Count/sum(Count))), position = position_stack(vjust = 0.5)) + 
+      ggplot2::geom_text(aes(label = scales::percent(Count/sum(Count))), position = position_stack(vjust = 0.5), size = 5, fontface = "bold") + 
       ggplot2::theme_minimal() +
       ggplot2::theme(axis.title.x=element_blank(),
                      axis.text.x=element_blank(),
                      axis.ticks.x=element_blank(),
                      axis.title.y=element_blank(),
                      axis.text.y=element_blank(),
-                     axis.ticks.y=element_blank())
+                     axis.ticks.y=element_blank(),
+                     plot.title = ggplot2::element_text(size = 20, face = "bold"),
+                     legend.text = ggplot2::element_text(size = 12))  # Making legend text bigger
   })
   
   output$stackedBar <- renderPlot({
