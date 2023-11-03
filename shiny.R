@@ -66,16 +66,16 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                  tabsetPanel(
                                    tabPanel("Non Compliance to Order Acknowledgement Table",
                                             rpivotTableOutput("pivot1"),
-                                            div(style = "position: absolute; top: 850px; right: 1250px;", 
-                                                tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" accordingly", 
-                                                       style = "font-size: 11px; font-weight; bold; color: blue;")
+                                            div(style = "position: absolute; top: 52px; right: 1000px;", 
+                                                tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" accordingly. Please ensure to sort by clicking \"⭥\" or \"⭤\" button", 
+                                                       style = "font-size: 12px; font-weight; bold; color: red;")
                                             )
                                    ),
                                    tabPanel("Non Compliance to Order Acknowledgement Plot",
                                             rpivotTableOutput("barplot"),
-                                            div(style = "position: absolute; top: 850px; right: 1250px;", 
-                                                tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" accordingly", 
-                                                       style = "font-size: 11px; font-weight; bold; color: blue;")
+                                            div(style = "position: absolute; top: 52px; right: 1000px;", 
+                                                tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" field accordingly. Please ensure to sort by clicking \"⭥\" or \"⭤\" button", 
+                                                       style = "font-size: 12px; font-weight; bold; color: red;")
                                             )
                                    ),
                                    tabPanel("Fail Status Table",
@@ -93,9 +93,9 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                    column(width = 12, 
                                           rpivotTableOutput("pivot3")
                                    ),
-                                   div(style = "position: absolute; top: 590px; right: 1250px;", 
-                                       tags$p("Please ensure that you unselect \"E\" from the \"Order ack\" option in the left panel", 
-                                              style = "font-size: 9px; font-weight; bold; color: blue;")
+                                   div(style = "position: absolute; top: 52px; right: 1000px;", 
+                                       tags$p("Please ensure that you unselect \"E\" from the \"Order ack\" field in the left panel. Please ensure to sort by clicking \"⭥\" or \"⭤\" button", 
+                                              style = "font-size: 12px; font-weight; bold; color: red;")
                                    ),
                                    
                                  )
@@ -114,7 +114,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             plotOutput("lineGraph")
                                    ),
                                    tabPanel("Order Date Average Graph",
-                                            selectInput("Week", "Select Week Number:", 
+                                            selectInput("Week_avg", "Select Week Number:", 
                                                         choices = unique(cleaned_default_data$Week), 
                                                         multiple = TRUE, 
                                                         selected = unique(cleaned_default_data$Week)),
@@ -251,7 +251,7 @@ server <- function(input, output, session) {
   
   output$pieChart <- renderPlot({
     pie_data <- data_to_display() %>% 
-      dplyr::filter(Week == input$Week | is.null(input$Week)) %>% 
+      dplyr::filter(Week %in% input$Week) %>%
       group_by(Fail) %>% 
       summarise(Count = n_distinct(`CustomerName`))
     
@@ -334,19 +334,27 @@ server <- function(input, output, session) {
         legend.title = ggplot2::element_text(size = 16, face = "bold"),
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
         legend.key.size = unit(1.5, "cm")  # Increase legend key size
+        
       )
     print(p)
   })
   
   output$avgGraph <- renderPlot({
-    avg_data <- data_to_display() %>%
-      dplyr::filter(Week %in% input$Week, Fail %in% input$Fail) %>%
+    avg_data <- data_to_display() 
+    
+    # Apply filtering only if inputs are not NULL
+    if (!is.null(input$Week_avg) & !is.null(input$Fail)) {
+      avg_data <- avg_data %>%
+        dplyr::filter(Week %in% input$Week_avg, Fail %in% input$Fail)
+    }
+    
+    avg_data <- avg_data %>%
       dplyr::group_by(`OrderDate`) %>%
       dplyr::summarise(
         Avg_Target = mean(Target, na.rm = TRUE),
         Avg_Days_to_acknowledge = mean(`Days to acknowledge`, na.rm = TRUE)
       ) %>%
-      tidyr::gather(key = "Metric", value = "Value", Avg_Days_to_acknowledge)
+      tidyr::gather(key = "Metric", value = "Value", -`OrderDate`)
     
     # Convert Order date to factor
     avg_data$`OrderDate` <- factor(avg_data$`OrderDate`, levels = unique(avg_data$`OrderDate`))
