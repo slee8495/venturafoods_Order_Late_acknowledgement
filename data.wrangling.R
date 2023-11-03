@@ -43,7 +43,7 @@ clean_data <- function(raw_data_as400) {
                   Order = order,
                   CustomerName = customer_name,
                   Customer = customer,
-                  "Order date" = order_date,
+                  OrderDate = order_date,
                   Week = week_number,
                   "Delivery date" = delivery_date,
                   "Ship date" = ship_date,
@@ -65,7 +65,7 @@ data_info <- function() {
 }
 
 # Default Data 
-raw_data_as400 <- read_csv("SUM348094.csv")
+raw_data_as400 <- read_csv("SUM348094.CSV")
 cleaned_default_data <- clean_data(raw_data_as400)
 
 
