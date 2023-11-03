@@ -31,8 +31,19 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                      tags$br(),
                                      tags$br(),
                                      tags$br(),
-                                     tags$p("If you'd like to view data for a different date range, please feel free to upload your own AS400 data (2269)",
-                                            style = "font-size: 18px; font-weight: bold;")
+                                     tags$p(
+                                       HTML(paste("<span style='color:red;'>", data_info(), "</span>",
+                                                  tags$br(), 
+                                                  "If you wish to explore data for a different date range,",
+                                                  "you are welcome to upload your own AS400 data (2269).",
+                                                  "The image above provides an example of retrieving original raw data from AS400")),
+                                       style = "font-size: 18px; font-weight: bold;"
+                                     ),
+                                     absolutePanel(
+                                       top = "105%",  # Adjust top position as needed
+                                       left = "55%",  # Adjust left position as needed
+                                       img(src = "VenturaFoodsLogo.png", height = 70, width = 500)
+                                     )
                                    )
                                  )
                         ),
@@ -57,14 +68,14 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             rpivotTableOutput("pivot1"),
                                             div(style = "position: absolute; top: 850px; right: 1250px;", 
                                                 tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" accordingly", 
-                                                       style = "font-size: 11px; font-weight: bold; color: blue;")
+                                                       style = "font-size: 11px; font-weight; bold; color: blue;")
                                             )
                                    ),
                                    tabPanel("Non Compliance to Order Acknowledgement Plot",
                                             rpivotTableOutput("barplot"),
                                             div(style = "position: absolute; top: 850px; right: 1250px;", 
                                                 tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" accordingly", 
-                                                       style = "font-size: 11px; font-weight: bold; color: blue;")
+                                                       style = "font-size: 11px; font-weight; bold; color: blue;")
                                             )
                                    ),
                                    tabPanel("Fail Status Table",
@@ -84,7 +95,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                    ),
                                    div(style = "position: absolute; top: 590px; right: 1250px;", 
                                        tags$p("Please ensure that you unselect \"E\" from the \"Order ack\" option in the left panel", 
-                                              style = "font-size: 9px; font-weight: bold; color: blue;")
+                                              style = "font-size: 9px; font-weight; bold; color: blue;")
                                    ),
                                    
                                  )
@@ -130,10 +141,23 @@ server <- function(input, output, session) {
     if (!is.null(input$file1)) {
       # Read uploaded file
       uploaded_data <- readr::read_csv(input$file1$datapath)
-      # Clean the uploaded data using the `clean_data` function
-      cleaned_uploaded_data <- clean_data(uploaded_data)
-      # Update the reactive value
-      data_to_display(cleaned_uploaded_data)
+      # Check if the structure of the uploaded data matches the expected structure
+      if (identical(names(uploaded_data), names(raw_data_as400))) {
+        # Clean the uploaded data using the `clean_data` function
+        cleaned_uploaded_data <- clean_data(uploaded_data)
+        # Update the reactive value
+        data_to_display(cleaned_uploaded_data)
+      } else {
+        # Handle the case where the uploaded data structure is not compatible
+        showModal(
+          modalDialog(
+            title = "Data Structure Error",
+            "The structure of the uploaded data does not match the expected structure.",
+            footer = NULL
+          )
+        )
+        # You can choose to do other error handling or provide instructions to the user here
+      }
     }
   })
   
