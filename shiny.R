@@ -104,20 +104,21 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         tabPanel("Overall Process Summary",
                                  tabsetPanel(
                                    tabPanel("Fail Distribution - Pie Chart",
-                                            selectInput("Week", "Select Week Number:", unique(cleaned_default_data$Week), multiple = TRUE, selected = unique(cleaned_default_data$Week)),
+                                            tags$br(),
+                                            tags$br(),
                                             plotOutput("pieChart")
                                    ),
                                    tabPanel("Stacked Bar Chart",
+                                            tags$br(),
+                                            tags$br(),
                                             plotOutput("stackedBar")
                                    ),
                                    tabPanel("Line Graph",
+                                            tags$br(),
+                                            tags$br(),
                                             plotOutput("lineGraph")
                                    ),
                                    tabPanel("Order Date Average Graph",
-                                            selectInput("Week_avg", "Select Week Number:", 
-                                                        choices = unique(cleaned_default_data$Week), 
-                                                        multiple = TRUE, 
-                                                        selected = unique(cleaned_default_data$Week)),
                                             selectInput("Fail", "Select Fail Status:", 
                                                         choices = unique(cleaned_default_data$Fail),
                                                         selected = unique(cleaned_default_data$Fail),
@@ -251,7 +252,6 @@ server <- function(input, output, session) {
   
   output$pieChart <- renderPlot({
     pie_data <- data_to_display() %>% 
-      dplyr::filter(Week %in% input$Week) %>%
       group_by(Fail) %>% 
       summarise(Count = n_distinct(`CustomerName`))
     
@@ -326,6 +326,7 @@ server <- function(input, output, session) {
       ggplot2::geom_text(aes(label = Count), vjust = -0.5, size = 5, fontface = "bold") +  # making the text label larger and bold
       ggplot2::theme_classic() +
       ggplot2::labs(y = "Number of Customers", x = "OrderDate", color = "Fail Status") +
+      ggplot2::ylim(0, max(line_data$Count, na.rm = TRUE) + 1) +  # Setting Y-axis to start from 0
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
         axis.text.y = ggplot2::element_text(size = 14, face = "bold"),
@@ -343,18 +344,20 @@ server <- function(input, output, session) {
     avg_data <- data_to_display() 
     
     # Apply filtering only if inputs are not NULL
-    if (!is.null(input$Week_avg) & !is.null(input$Fail)) {
+    if (!is.null(input$Fail)) {
       avg_data <- avg_data %>%
-        dplyr::filter(Week %in% input$Week_avg, Fail %in% input$Fail)
+        dplyr::filter(Fail %in% input$Fail)
     }
     
     avg_data <- avg_data %>%
       dplyr::group_by(`OrderDate`) %>%
+      dplyr::mutate(`Days to acknowledge` = as.numeric(`Days to acknowledge`)) %>% 
       dplyr::summarise(
-        Avg_Target = mean(Target, na.rm = TRUE),
+        Target = mean(Target, na.rm = TRUE),
         Avg_Days_to_acknowledge = mean(`Days to acknowledge`, na.rm = TRUE)
       ) %>%
-      tidyr::gather(key = "Metric", value = "Value", -`OrderDate`)
+      tidyr::gather(key = "Metric", value = "Value", -`OrderDate`) %>% 
+      dplyr::mutate(Value = ifelse(Metric == "Target", 2, Value))
     
     # Convert Order date to factor
     avg_data$`OrderDate` <- factor(avg_data$`OrderDate`, levels = unique(avg_data$`OrderDate`))
@@ -363,9 +366,7 @@ server <- function(input, output, session) {
     
     p <- ggplot2::ggplot(avg_data, ggplot2::aes(x = `OrderDate`, y = Value, color = Metric, group = Metric)) +
       ggplot2::geom_line(size = 1) +
-      ggplot2::geom_hline(yintercept = 2, linetype = "dashed", color = "blue", size = 1) +  # Adding a target line at y=2
       ggplot2::geom_text(aes(label=sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  # Adding text labels for the plotted values, made larger and bold
-      ggplot2::annotate("text", x = last_date, y = 2.2, label = "Target", hjust = -1.9, color = "black", size = 6, fontface = "bold") +  # Making "Target" label larger and bold
       ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  # Setting Y-axis to start from 0
       ggplot2::theme_classic() +
       ggplot2::labs(y = "Value", x = "OrderDate", color = "Metric") +

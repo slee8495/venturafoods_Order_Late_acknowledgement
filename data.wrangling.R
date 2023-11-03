@@ -53,7 +53,8 @@ clean_data <- function(raw_data_as400) {
                   "Date Acknowledgement Calc." = date_acknowledgement_calc,
                   Target = target,
                   "Days to acknowledge" = days_to_acknowledge,
-                  Fail = fail)
+                  Fail = fail) %>% 
+    dplyr::filter(!is.na(OrderDate) & OrderDate != 0)
   
   return(cleaned_data)
 }
