@@ -377,6 +377,7 @@ server <- function(input, output, session) {
         legend.title = ggplot2::element_text(size = 16, face = "bold"),
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
         legend.key.size = unit(1.5, "cm")  # Increase legend key size
+        
       )
     print(p)
   })
