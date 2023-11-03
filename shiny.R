@@ -1,5 +1,5 @@
 # Load required libraries
-# library(shiny)
+library(shiny)
 library(readr)
 library(writexl)
 library(dplyr)
@@ -57,7 +57,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                  fluidRow(
                                    column(width = 12, 
                                           rpivotTableOutput("pivot")),
-                                   div(style = "position: absolute; top: 52px; right:1200px;", 
+                                   div(style = "position: absolute; top: 52px; right:1000px;", 
                                        tags$p("Please ensure to sort by clicking \"⭥\" or \"⭤\" button", 
                                               style = "font-size: 12px; font-weight: bold; color: red;"))
                                  )
@@ -66,14 +66,14 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                  tabsetPanel(
                                    tabPanel("Non Compliance to Order Acknowledgement Table",
                                             rpivotTableOutput("pivot1"),
-                                            div(style = "position: absolute; top: 850px; right: 1450px;", 
+                                            div(style = "position: absolute; top: 850px; right: 1250px;", 
                                                 tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" accordingly", 
                                                        style = "font-size: 11px; font-weight; bold; color: blue;")
                                             )
                                    ),
                                    tabPanel("Non Compliance to Order Acknowledgement Plot",
                                             rpivotTableOutput("barplot"),
-                                            div(style = "position: absolute; top: 850px; right: 1450px;", 
+                                            div(style = "position: absolute; top: 850px; right: 1250px;", 
                                                 tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" accordingly", 
                                                        style = "font-size: 11px; font-weight; bold; color: blue;")
                                             )
@@ -93,9 +93,9 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                    column(width = 12, 
                                           rpivotTableOutput("pivot3")
                                    ),
-                                   div(style = "position: absolute; top: 590px; right: 1350px;", 
+                                   div(style = "position: absolute; top: 590px; right: 1250px;", 
                                        tags$p("Please ensure that you unselect \"E\" from the \"Order ack\" option in the left panel", 
-                                              style = "font-size: 11px; font-weight; bold; color: blue;")
+                                              style = "font-size: 9px; font-weight; bold; color: blue;")
                                    ),
                                    
                                  )
@@ -314,17 +314,18 @@ server <- function(input, output, session) {
   
   output$lineGraph <- renderPlot({
     line_data <- data_to_display() %>%
-      dplyr::mutate(OrderDate = as.factor(OrderDate)) %>%
-      group_by(OrderDate, Fail) %>%
+      group_by(`OrderDate`, Fail) %>%
       summarise(Count = n_distinct(CustomerName)) %>%
       ungroup()
-  
     
-    p <- ggplot2::ggplot(line_data, ggplot2::aes(x = OrderDate, y = Count, color = Fail, group = Fail)) +
+    # Convert Order date to factor
+    line_data$`OrderDate` <- factor(line_data$`OrderDate`, levels = unique(line_data$`OrderDate`))
+    
+    p <- ggplot2::ggplot(line_data, ggplot2::aes(x = `OrderDate`, y = Count, color = Fail, group = Fail)) +
       ggplot2::geom_line(size = 1) +
       ggplot2::geom_text(aes(label = Count), vjust = -0.5, size = 5, fontface = "bold") +  # making the text label larger and bold
       ggplot2::theme_classic() +
-      ggplot2::labs(y = "Number of Customers", x = "Order Date", color = "Fail Status") +
+      ggplot2::labs(y = "Number of Customers", x = "OrderDate", color = "Fail Status") +
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
         axis.text.y = ggplot2::element_text(size = 14, face = "bold"),
@@ -340,19 +341,24 @@ server <- function(input, output, session) {
   output$avgGraph <- renderPlot({
     avg_data <- data_to_display() %>%
       dplyr::filter(Week %in% input$Week, Fail %in% input$Fail) %>%
-      dplyr::mutate(OrderDate = as.factor(OrderDate)) %>% 
-      dplyr::group_by(OrderDate) %>%
+      dplyr::group_by(`OrderDate`) %>%
       dplyr::summarise(
+        Avg_Target = mean(Target, na.rm = TRUE),
         Avg_Days_to_acknowledge = mean(`Days to acknowledge`, na.rm = TRUE)
       ) %>%
       tidyr::gather(key = "Metric", value = "Value", Avg_Days_to_acknowledge)
     
-    p <- ggplot2::ggplot(avg_data, ggplot2::aes(x = OrderDate, y = Value, color = Metric, group = Metric)) +
+    # Convert Order date to factor
+    avg_data$`OrderDate` <- factor(avg_data$`OrderDate`, levels = unique(avg_data$`OrderDate`))
+    
+    last_date <- tail(levels(avg_data$`OrderDate`), 1)  # Get the last level of the factor
+    
+    p <- ggplot2::ggplot(avg_data, ggplot2::aes(x = `OrderDate`, y = Value, color = Metric, group = Metric)) +
       ggplot2::geom_line(size = 1) +
-      ggplot2::geom_hline(yintercept = 2, linetype = "dashed", color = "blue", size = 1) +
-      ggplot2::geom_text(aes(label = sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +
-      ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +
-      ggplot2::scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +  # Customize date axis
+      ggplot2::geom_hline(yintercept = 2, linetype = "dashed", color = "blue", size = 1) +  # Adding a target line at y=2
+      ggplot2::geom_text(aes(label=sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  # Adding text labels for the plotted values, made larger and bold
+      ggplot2::annotate("text", x = last_date, y = 2.2, label = "Target", hjust = -1.9, color = "black", size = 6, fontface = "bold") +  # Making "Target" label larger and bold
+      ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  # Setting Y-axis to start from 0
       ggplot2::theme_classic() +
       ggplot2::labs(y = "Value", x = "OrderDate", color = "Metric") +
       ggplot2::theme(
@@ -362,12 +368,10 @@ server <- function(input, output, session) {
         axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
         legend.title = ggplot2::element_text(size = 16, face = "bold"),
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
-        legend.key.size = unit(1.5, "cm")
+        legend.key.size = unit(1.5, "cm")  # Increase legend key size
       )
-    
     print(p)
   })
-  
   
   
   
