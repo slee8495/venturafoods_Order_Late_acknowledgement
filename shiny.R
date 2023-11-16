@@ -50,7 +50,8 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         tabPanel("View Data",
                                  fluidRow(
                                    column(width = 12, 
-                                          dataTableOutput("viewData"))
+                                          dataTableOutput("viewData"),
+                                          downloadButton("downloadViewData", "Download Data"))
                                  )
                         ),
                         tabPanel("Customer Summary",
@@ -384,6 +385,15 @@ server <- function(input, output, session) {
   })
   
   
+  
+  
+  output$downloadViewData <- downloadHandler(
+    filename = function() {
+      paste("view_data-", Sys.Date(), ".csv", sep = "")
+    },
+    content = function(file) {
+      write.csv(data_to_display(), file, row.names = FALSE)
+  })  
   
 }
 
