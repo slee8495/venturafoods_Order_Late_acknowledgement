@@ -40,8 +40,8 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                        style = "font-size: 18px; font-weight: bold;"
                                      ),
                                      absolutePanel(
-                                       top = "105%",  # Adjust top position as needed
-                                       left = "55%",  # Adjust left position as needed
+                                       top = "105%",  
+                                       left = "55%",  
                                        img(src = "VenturaFoodsLogo.png", height = 70, width = 500)
                                      )
                                    )
@@ -138,18 +138,18 @@ server <- function(input, output, session) {
   data_to_display <- reactiveVal(cleaned_default_data)
   
   observeEvent(input$file1, {
-    # Check if a file is uploaded
+    
     if (!is.null(input$file1)) {
-      # Read uploaded file
+      
       uploaded_data <- readr::read_csv(input$file1$datapath)
-      # Check if the structure of the uploaded data matches the expected structure
+     
       if (identical(names(uploaded_data), names(raw_data_as400))) {
-        # Clean the uploaded data using the `clean_data` function
+       
         cleaned_uploaded_data <- clean_data(uploaded_data)
-        # Update the reactive value
+       
         data_to_display(cleaned_uploaded_data)
       } else {
-        # Handle the case where the uploaded data structure is not compatible
+        
         showModal(
           modalDialog(
             title = "Data Structure Error",
@@ -157,7 +157,7 @@ server <- function(input, output, session) {
             footer = NULL
           )
         )
-        # You can choose to do other error handling or provide instructions to the user here
+      
       }
     }
   })
@@ -242,7 +242,7 @@ server <- function(input, output, session) {
   output$pivot3 <- renderRpivotTable({
     rpivotTable(data = data_to_display(),
                 rows = c("OrderDate", "Profile name"),
-                filters = c("Order ack"),  # User will have to manually deselect "E"
+                filters = c("Order ack"),  
                 vals = "Enter by name",
                 aggregatorName = "Count",
                 rendererName = "Table",
@@ -268,7 +268,7 @@ server <- function(input, output, session) {
                      axis.text.y=element_blank(),
                      axis.ticks.y=element_blank(),
                      plot.title = ggplot2::element_text(size = 20, face = "bold"),
-                     legend.text = ggplot2::element_text(size = 12))  # Making legend text bigger
+                     legend.text = ggplot2::element_text(size = 12)) 
   })
   
   output$stackedBar <- renderPlot({
@@ -276,21 +276,21 @@ server <- function(input, output, session) {
       dplyr::filter(!is.na(Week)) %>%
       group_by(Week, Fail) %>%
       summarise(Count = n_distinct(CustomerName)) %>%
-      ungroup() # Ungroup the data for further operations
+      ungroup()
     
-    # Convert Week to a factor
+   
     bar_data$Week <- factor(bar_data$Week, levels = unique(bar_data$Week), ordered = TRUE)
     
-    # Calculate total counts for each week
+  
     total_counts <- bar_data %>% group_by(Week) %>% summarise(Total = sum(Count))
     
-    # Merge total counts to bar_data
+   
     bar_data <- merge(bar_data, total_counts, by = "Week")
     
-    # Calculate percentages
+   
     bar_data$Percentage <- (bar_data$Count / bar_data$Total) * 100
     
-    # Calculate cumulative percentage
+    
     bar_data <- bar_data %>%
       arrange(Week, desc(Fail)) %>%
       group_by(Week) %>%
@@ -318,15 +318,15 @@ server <- function(input, output, session) {
       summarise(Count = n_distinct(CustomerName)) %>%
       ungroup()
     
-    # Convert Order date to factor
+   
     line_data$`OrderDate` <- factor(line_data$`OrderDate`, levels = unique(line_data$`OrderDate`))
     
     p <- ggplot2::ggplot(line_data, ggplot2::aes(x = `OrderDate`, y = Count, color = Fail, group = Fail)) +
       ggplot2::geom_line(size = 1) +
-      ggplot2::geom_text(aes(label = Count), vjust = -0.5, size = 5, fontface = "bold") +  # making the text label larger and bold
+      ggplot2::geom_text(aes(label = Count), vjust = -0.5, size = 5, fontface = "bold") +  
       ggplot2::theme_classic() +
       ggplot2::labs(y = "Number of Customers", x = "OrderDate", color = "Fail Status") +
-      ggplot2::ylim(0, max(line_data$Count, na.rm = TRUE) + 1) +  # Setting Y-axis to start from 0
+      ggplot2::ylim(0, max(line_data$Count, na.rm = TRUE) + 1) +  
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
         axis.text.y = ggplot2::element_text(size = 14, face = "bold"),
@@ -334,7 +334,7 @@ server <- function(input, output, session) {
         axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
         legend.title = ggplot2::element_text(size = 16, face = "bold"),
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
-        legend.key.size = unit(1.5, "cm")  # Increase legend key size
+        legend.key.size = unit(1.5, "cm")  
         
       )
     print(p)
@@ -343,7 +343,7 @@ server <- function(input, output, session) {
   output$avgGraph <- renderPlot({
     avg_data <- data_to_display() 
     
-    # Apply filtering only if inputs are not NULL
+   
     if (!is.null(input$Fail)) {
       avg_data <- avg_data %>%
         dplyr::filter(Fail %in% input$Fail)
@@ -359,15 +359,15 @@ server <- function(input, output, session) {
       tidyr::gather(key = "Metric", value = "Value", -`OrderDate`) %>% 
       dplyr::mutate(Value = ifelse(Metric == "Target", 2, Value))
     
-    # Convert Order date to factor
+   
     avg_data$`OrderDate` <- factor(avg_data$`OrderDate`, levels = unique(avg_data$`OrderDate`))
     
-    last_date <- tail(levels(avg_data$`OrderDate`), 1)  # Get the last level of the factor
+    last_date <- tail(levels(avg_data$`OrderDate`), 1) 
     
     p <- ggplot2::ggplot(avg_data, ggplot2::aes(x = `OrderDate`, y = Value, color = Metric, group = Metric)) +
       ggplot2::geom_line(size = 1) +
-      ggplot2::geom_text(aes(label=sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  # Adding text labels for the plotted values, made larger and bold
-      ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  # Setting Y-axis to start from 0
+      ggplot2::geom_text(aes(label=sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  
+      ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  
       ggplot2::theme_classic() +
       ggplot2::labs(y = "Value", x = "OrderDate", color = "Metric") +
       ggplot2::theme(
@@ -377,7 +377,7 @@ server <- function(input, output, session) {
         axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
         legend.title = ggplot2::element_text(size = 16, face = "bold"),
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
-        legend.key.size = unit(1.5, "cm")  # Increase legend key size
+        legend.key.size = unit(1.5, "cm") 
         
       )
     print(p)
