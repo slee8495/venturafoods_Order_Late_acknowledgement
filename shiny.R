@@ -1,15 +1,15 @@
 # Load required libraries
+library(tidyverse)
 library(shiny)
 library(readr)
 library(writexl)
-library(dplyr)
 library(janitor)
 library(tidyr)
 library(lubridate)
 library(DT)
 library(rpivotTable)
 library(shinyjs)
-library(ggplot2)
+library(shinyWidgets)
 
 # Source the data wrangling script to get the cleaned_default_data
 source("data.wrangling.R")
@@ -56,9 +56,14 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         ),
                         tabPanel("Customer Summary",
                                  fluidRow(
-                                   column(width = 12, 
-                                          rpivotTableOutput("pivot")),
-                                   div(style = "position: absolute; top: 52px; right:1000px;")
+                                   column(width = 3,
+                                          pickerInput("customerSummaryPicker", "Select Customer:", choices = NULL, 
+                                                      options = list(`actions-box` = TRUE, `live-search` = TRUE), multiple = TRUE)
+                                          
+                                   ),
+                                   column(width = 9,
+                                          dataTableOutput("pivot")
+                                   )
                                  )
                         ),
                         tabPanel("Summary by Profile name",
@@ -136,16 +141,26 @@ server <- function(input, output, session) {
   
   data_to_display <- reactiveVal(cleaned_default_data)
   
+  # Reactive expression for unique customer names
+  customer_names <- reactive({
+    unique(data_to_display()$CustomerName)
+  })
+  
+  # Observe changes in customer names and update pickerInput
+  observe({
+    updatePickerInput(session, "customerSummaryPicker", choices = sort(customer_names()))
+  })
+  
   observeEvent(input$file1, {
     
     if (!is.null(input$file1)) {
       
       uploaded_data <- readr::read_csv(input$file1$datapath)
-     
+      
       if (identical(names(uploaded_data), names(raw_data_as400))) {
-       
+        
         cleaned_uploaded_data <- clean_data(uploaded_data)
-       
+        
         data_to_display(cleaned_uploaded_data)
       } else {
         
@@ -156,7 +171,7 @@ server <- function(input, output, session) {
             footer = NULL
           )
         )
-      
+        
       }
     }
   })
@@ -181,32 +196,61 @@ server <- function(input, output, session) {
                 fixedColumns = list(leftColumns = 2),
                 searchDelay = 500
               ),
-              filter = 'top'
+              filter = 'top',
+              rownames = FALSE
     )
   })
   
   
   
-  output$pivot <- renderRpivotTable({
-    rpivotTable(data = data_to_display(), 
-                rows = "CustomerName", 
-                cols = "Fail", 
-                vals = "CustomerName", 
-                aggregatorName = "Count as Fraction of Rows", 
-                rendererName = "Table", 
-                width="100%", 
-                height="400px")
+  output$pivot <- renderDataTable({
+    
+    # Generate pivot table data with filtering integrated
+    pivot_data <- data_to_display() %>%
+      mutate(Fail = gsub("yes", "Yes", Fail)) %>% 
+      filter(CustomerName %in% input$customerSummaryPicker | length(input$customerSummaryPicker) == 0) %>%
+      group_by(CustomerName, Fail) %>%
+      summarise(Count = n(), .groups = 'drop') %>% 
+      pivot_wider(names_from = Fail, values_from = Count, values_fill = list(Count = 0)) 
+    
+    # Ensure both 'Yes' and 'No' columns exist
+    if (!"Yes" %in% names(pivot_data)) {
+      pivot_data$Yes <- 0
+    }
+    if (!"No" %in% names(pivot_data)) {
+      pivot_data$No <- 0
+    }
+    
+    # Calculate column-wise totals as counts
+    column_totals <- colSums(select(pivot_data, -CustomerName), na.rm = TRUE)
+    total_row <- data.frame(CustomerName = "Total", t(column_totals))
+    
+    # Bind the total row at the top
+    pivot_data <- bind_rows(total_row, pivot_data) %>% 
+      mutate(yes_no = Yes + No,
+             Yes = Yes / yes_no * 1,
+             No = No / yes_no * 1) %>% 
+      select(-yes_no)
+    
+    datatable(pivot_data, extensions = 'Buttons',
+              options = list(
+                pageLength = 5000, 
+                scrollX = TRUE,
+                dom = "Blfrtip",
+                buttons = c("copy", "csv", "excel"),
+                fixedColumns = list(leftColumns = 2)), 
+              rownames = FALSE) %>%
+      formatPercentage(columns = c("Yes", "No"), digits = 2) %>%
+      formatStyle(
+        columns = 1:ncol(pivot_data),
+        fontWeight = styleEqual("Total", "bold"),
+        backgroundColor = styleEqual("Total", "#f2f2f2"),
+        target = "row"
+      )
   })
   
-  output$pivot1 <- renderRpivotTable({
-    rpivotTable(data = data_to_display(),
-                rows = "Profile name",
-                vals = "CustomerName",
-                aggregatorName = "Count",
-                rendererName = "Table",
-                width="100%",
-                height="400px")
-  })
+  
+  
   
   output$barplot <- renderRpivotTable({
     rpivotTable(data = data_to_display(),
@@ -279,16 +323,16 @@ server <- function(input, output, session) {
       summarise(Count = n_distinct(CustomerName)) %>%
       ungroup()
     
-   
+    
     bar_data$Week <- factor(bar_data$Week, levels = unique(bar_data$Week), ordered = TRUE)
     
-  
+    
     total_counts <- bar_data %>% group_by(Week) %>% summarise(Total = sum(Count))
     
-   
+    
     bar_data <- merge(bar_data, total_counts, by = "Week")
     
-   
+    
     bar_data$Percentage <- (bar_data$Count / bar_data$Total) * 100
     
     
@@ -319,7 +363,7 @@ server <- function(input, output, session) {
       summarise(Count = n_distinct(CustomerName)) %>%
       ungroup()
     
-   
+    
     line_data$`OrderDate` <- factor(line_data$`OrderDate`, levels = unique(line_data$`OrderDate`))
     
     p <- ggplot2::ggplot(line_data, ggplot2::aes(x = `OrderDate`, y = Count, color = Fail, group = Fail)) +
@@ -344,7 +388,7 @@ server <- function(input, output, session) {
   output$avgGraph <- renderPlot({
     avg_data <- data_to_display() 
     
-   
+    
     if (!is.null(input$Fail)) {
       avg_data <- avg_data %>%
         dplyr::filter(Fail %in% input$Fail)
@@ -360,7 +404,7 @@ server <- function(input, output, session) {
       tidyr::gather(key = "Metric", value = "Value", -`OrderDate`) %>% 
       dplyr::mutate(Value = ifelse(Metric == "Target", 2, Value))
     
-   
+    
     avg_data$`OrderDate` <- factor(avg_data$`OrderDate`, levels = unique(avg_data$`OrderDate`))
     
     last_date <- tail(levels(avg_data$`OrderDate`), 1) 
@@ -393,7 +437,7 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       write.csv(data_to_display(), file, row.names = FALSE)
-  })  
+    })  
   
 }
 
