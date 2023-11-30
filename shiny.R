@@ -57,14 +57,16 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         tabPanel("Customer Summary",
                                  fluidRow(
                                    column(width = 3,
-                                          pickerInput("customerSummaryPicker", "Select Customer:", choices = NULL, 
-                                                      options = list(`actions-box` = TRUE, `live-search` = TRUE), multiple = TRUE)
-                                          
+                                          pickerInput("customerSummaryPicker", "Customer:", choices = NULL, 
+                                                      options = list(`actions-box` = TRUE, `live-search` = TRUE), multiple = TRUE),
+                                          dateRangeInput("dateRange", "Order Date Range:",
+                                                         start = Sys.Date() - 30, end = Sys.Date())
                                    ),
                                    column(width = 9,
                                           dataTableOutput("pivot")
                                    )
                                  )
+                                 
                         ),
                         tabPanel("Summary by Profile name",
                                  tabsetPanel(
@@ -205,8 +207,12 @@ server <- function(input, output, session) {
   
   output$pivot <- renderDataTable({
     
-    # Generate pivot table data with filtering integrated
+    # Get the selected date range
+    selected_dates <- input$dateRange
+    
+    # Filter the data based on the selected date range and customer picker
     pivot_data <- data_to_display() %>%
+      filter(OrderDate >= selected_dates[1] & OrderDate <= selected_dates[2]) %>%
       mutate(Fail = gsub("yes", "Yes", Fail)) %>% 
       filter(CustomerName %in% input$customerSummaryPicker | length(input$customerSummaryPicker) == 0) %>%
       group_by(CustomerName, Fail) %>%
