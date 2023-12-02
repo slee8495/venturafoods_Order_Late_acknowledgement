@@ -11,7 +11,6 @@ library(rpivotTable)
 library(shinyjs)
 library(shinyWidgets)
 
-# Source the data wrangling script to get the cleaned_default_data
 source("data.wrangling.R")
 
 # UI Part
@@ -48,6 +47,8 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                  )
                         ),
                         tabPanel("View Data",
+                                 br(),
+                                 br(),
                                  fluidRow(
                                    column(width = 12, 
                                           dataTableOutput("viewData"),
@@ -55,35 +56,56 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                  )
                         ),
                         tabPanel("Customer Summary",
+                                 br(),
                                  fluidRow(
                                    column(width = 3,
-                                          pickerInput("customerSummaryPicker", "Customer:", choices = NULL, 
-                                                      options = list(`actions-box` = TRUE, `live-search` = TRUE), multiple = TRUE),
+                                          pickerInput("customerSummaryPicker", "Customer:", 
+                                                      choices = sort(unique(cleaned_default_data$CustomerName)), 
+                                                      selected = cleaned_default_data$CustomerName,
+                                                      options = list(`actions-box` = TRUE, `live-search` = TRUE), 
+                                                      multiple = TRUE),
                                           dateRangeInput("dateRange", "Order Date Range:",
-                                                         start = Sys.Date() - 30, end = Sys.Date())
+                                                         start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                         end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
                                    ),
                                    column(width = 9,
                                           dataTableOutput("pivot")
                                    )
                                  )
-                                 
                         ),
                         tabPanel("Summary by Profile name",
+                                 br(),
                                  tabsetPanel(
                                    tabPanel("Non Compliance to Order Acknowledgement Table",
-                                            rpivotTableOutput("pivot1"),
-                                            div(style = "position: absolute; top: 52px; right: 1000px;", 
-                                                tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" accordingly. Please ensure to sort by clicking \"⭥\" or \"⭤\" button", 
-                                                       style = "font-size: 12px; font-weight; bold; color: red;")
+                                            br(),
+                                            fluidRow(
+                                              column(width = 3,
+                                                     pickerInput("failFilter", "Fail Status:", 
+                                                                 choices = sort(unique(cleaned_default_data$Fail)),
+                                                                 selected = cleaned_default_data$Fail[1], multiple = TRUE),
+                                                     dateRangeInput("dateRange_2", "Order Date Range:",
+                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE))),
+                                              column(width = 9,
+                                                     DT::dataTableOutput("pivot1"))
                                             )
                                    ),
                                    tabPanel("Non Compliance to Order Acknowledgement Plot",
-                                            rpivotTableOutput("barplot"),
-                                            div(style = "position: absolute; top: 52px; right: 1000px;", 
-                                                tags$p("Please ensure that you select \"Yes\" or \"No\" from the \"Fail\" field accordingly. Please ensure to sort by clicking \"⭥\" or \"⭤\" button", 
-                                                       style = "font-size: 12px; font-weight; bold; color: red;")
+                                            br(),
+                                            fluidRow(
+                                              column(width = 3,
+                                                     pickerInput("failFilter_2", "Fail Status:", 
+                                                                 choices = sort(unique(cleaned_default_data$Fail)),
+                                                                 selected = cleaned_default_data$Fail[1], multiple = TRUE),
+                                                     dateRangeInput("dateRange_3", "Order Date Range:",
+                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
+                                              ),
+                                              column(width = 9,
+                                                     plotOutput("barplot"))
                                             )
                                    ),
+                                   
                                    tabPanel("Fail Status Table",
                                             rpivotTableOutput("pivot2")
                                    ),
@@ -91,8 +113,6 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             rpivotTableOutput("stackedbarplot")
                                    )
                                  )
-                                 
-                                 
                         ),
                         tabPanel("Not Acknowledged",
                                  fluidRow(
@@ -140,15 +160,56 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
 
 # Server logic
 server <- function(input, output, session) {
-  
   data_to_display <- reactiveVal(cleaned_default_data)
   
-  # Reactive expression for unique customer names
+  min_date <- reactive({
+    min(data_to_display()$OrderDate, na.rm = TRUE)
+  })
+  
+  max_date <- reactive({
+    max(data_to_display()$OrderDate, na.rm = TRUE)
+  })
+  
+  # Observe event for file upload
+  observeEvent(input$file1, {
+    if (!is.null(input$file1)) {
+      uploaded_data <- readr::read_csv(input$file1$datapath)
+      
+      if (identical(names(uploaded_data), names(raw_data_as400))) {
+        cleaned_uploaded_data <- clean_data(uploaded_data)
+        data_to_display(cleaned_uploaded_data)
+        
+        # Update the date range inputs
+        updateDateRangeInput(session, "dateRange", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        updateDateRangeInput(session, "dateRange_2", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        updateDateRangeInput(session, "dateRange_3", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+      } else {
+        showModal(
+          modalDialog(
+            title = "Data Structure Error",
+            "The structure of the uploaded data does not match the expected structure.",
+            footer = NULL
+          ))}}
+  })
+  
+  
+  
+  
+  
   customer_names <- reactive({
     unique(data_to_display()$CustomerName)
   })
   
-  # Observe changes in customer names and update pickerInput
+  
+  
+  
+  
   observe({
     updatePickerInput(session, "customerSummaryPicker", choices = sort(customer_names()))
   })
@@ -207,19 +268,15 @@ server <- function(input, output, session) {
   
   output$pivot <- renderDataTable({
     
-    # Get the selected date range
     selected_dates <- input$dateRange
     
-    # Filter the data based on the selected date range and customer picker
     pivot_data <- data_to_display() %>%
       filter(OrderDate >= selected_dates[1] & OrderDate <= selected_dates[2]) %>%
-      mutate(Fail = gsub("yes", "Yes", Fail)) %>% 
       filter(CustomerName %in% input$customerSummaryPicker | length(input$customerSummaryPicker) == 0) %>%
       group_by(CustomerName, Fail) %>%
       summarise(Count = n(), .groups = 'drop') %>% 
       pivot_wider(names_from = Fail, values_from = Count, values_fill = list(Count = 0)) 
     
-    # Ensure both 'Yes' and 'No' columns exist
     if (!"Yes" %in% names(pivot_data)) {
       pivot_data$Yes <- 0
     }
@@ -227,24 +284,24 @@ server <- function(input, output, session) {
       pivot_data$No <- 0
     }
     
-    # Calculate column-wise totals as counts
     column_totals <- colSums(select(pivot_data, -CustomerName), na.rm = TRUE)
     total_row <- data.frame(CustomerName = "Total", t(column_totals))
     
-    # Bind the total row at the top
     pivot_data <- bind_rows(total_row, pivot_data) %>% 
       mutate(yes_no = Yes + No,
              Yes = Yes / yes_no * 1,
              No = No / yes_no * 1) %>% 
       select(-yes_no)
     
-    datatable(pivot_data, extensions = 'Buttons',
-              options = list(
-                pageLength = 5000, 
-                scrollX = TRUE,
-                dom = "Blfrtip",
-                buttons = c("copy", "csv", "excel"),
-                fixedColumns = list(leftColumns = 2)), 
+    datatable(pivot_data, 
+              extensions = c("Buttons", "FixedHeader"), 
+              options = list(pageLength = 5000,
+                             dom = "Blfrtip",
+                             buttons = c("copy", "csv", "excel"),
+                             scrollX = TRUE,
+                             scrollY = "1500px",
+                             fixedHeader = TRUE,
+                             fixedColumns = list(leftColumns = 2)), 
               rownames = FALSE) %>%
       formatPercentage(columns = c("Yes", "No"), digits = 2) %>%
       formatStyle(
@@ -257,16 +314,78 @@ server <- function(input, output, session) {
   
   
   
-  
-  output$barplot <- renderRpivotTable({
-    rpivotTable(data = data_to_display(),
-                cols = "Profile name",
-                vals = "CustomerName",
-                aggregatorName = "Count",
-                rendererName = "Bar Chart",
-                width="100%",
-                height="400px")
+  output$pivot1 <- renderDataTable({
+    
+    selected_dates_2 <- input$dateRange_2
+    
+    pivot1_data <- data_to_display() %>%
+      filter(OrderDate >= selected_dates_2[1] & OrderDate <= selected_dates_2[2]) %>%
+      filter(Fail %in% input$failFilter) %>%  
+      group_by(`Profile name`) %>%
+      summarise(Count = n_distinct(`CustomerName`)) %>%
+      arrange(desc(Count))
+    
+    datatable(pivot1_data, 
+              extensions = c("Buttons", "FixedHeader"), 
+              options = list(pageLength = 5000,
+                             dom = "Blfrtip",
+                             buttons = c("copy", "csv", "excel"),
+                             scrollX = TRUE,
+                             scrollY = "1500px",
+                             fixedHeader = TRUE,
+                             fixedColumns = list(leftColumns = 2)), 
+              rownames = FALSE)
   })
+  
+  observeEvent(input$file1, {
+    updatePickerInput(session, "failFilter", 
+                      choices = unique(data_to_display()$Fail),
+                      selected = unique(data_to_display()$Fail[1]))
+  })
+  
+  
+  
+  
+  
+  
+  
+  output$barplot <- renderPlot({
+    
+    
+    
+    barplot_data <- data_to_display() %>%
+      filter(OrderDate >= input$dateRange_3[1] & OrderDate <= input$dateRange_3[2]) %>%
+      filter(Fail %in% input$failFilter_2) %>%  
+      group_by(`Profile name`) %>%
+      summarise(Count = n_distinct(`CustomerName`)) %>%
+      arrange(desc(Count))
+    
+    # Create ggplot bar plot with enhancements
+    ggplot(barplot_data, aes(x = reorder(`Profile name`, -Count), y = Count, fill = Count)) +
+      geom_bar(stat = "identity") +
+      scale_fill_gradient(low = "lightblue", high = "blue") +  
+      geom_text(aes(label = Count), vjust = -0.3, size = 3.5) + 
+      theme_classic() +
+      labs(y = "Count", x = "Profile name", title = "Non Compliance to Order Acknowledgement") +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 12, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+        legend.title = element_blank(),
+        legend.position = "none"
+      )
+  }, width = 1200, height = 800) 
+  
+  observeEvent(input$file1, {
+    updatePickerInput(session, "failFilter_2", 
+                      choices = unique(data_to_display()$Fail),
+                      selected = unique(data_to_display()$Fail[1]))
+  })
+  
+  
+  
   
   output$pivot2 <- renderRpivotTable({
     rpivotTable(data = data_to_display(),
@@ -444,6 +563,10 @@ server <- function(input, output, session) {
     content = function(file) {
       write.csv(data_to_display(), file, row.names = FALSE)
     })  
+  
+  
+  
+  
   
 }
 
