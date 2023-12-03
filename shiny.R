@@ -64,7 +64,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                       selected = cleaned_default_data$CustomerName,
                                                       options = list(`actions-box` = TRUE, `live-search` = TRUE), 
                                                       multiple = TRUE),
-                                          dateRangeInput("dateRange", "Order Date Range:",
+                                          dateRangeInput("dateRange", "Order Date:",
                                                          start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
                                                          end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
                                    ),
@@ -83,7 +83,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                      pickerInput("failFilter", "Fail Status:", 
                                                                  choices = sort(unique(cleaned_default_data$Fail)),
                                                                  selected = cleaned_default_data$Fail[1], multiple = TRUE),
-                                                     dateRangeInput("dateRange_2", "Order Date Range:",
+                                                     dateRangeInput("dateRange_2", "Order Date:",
                                                                     start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
                                                                     end = max(cleaned_default_data$OrderDate, na.rm = TRUE))),
                                               column(width = 9,
@@ -97,18 +97,24 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                      pickerInput("failFilter_2", "Fail Status:", 
                                                                  choices = sort(unique(cleaned_default_data$Fail)),
                                                                  selected = cleaned_default_data$Fail[1], multiple = TRUE),
-                                                     dateRangeInput("dateRange_3", "Order Date Range:",
+                                                     dateRangeInput("dateRange_3", "Order Date:",
                                                                     start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
                                                                     end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
                                               ),
                                               column(width = 9,
-                                                     plotOutput("barplot"))
-                                            )
-                                   ),
+                                                     plotOutput("barplot")))),
                                    
                                    tabPanel("Fail Status Table",
-                                            rpivotTableOutput("pivot2")
-                                   ),
+                                            br(),
+                                            fluidRow(
+                                              column(width = 3,
+                                                     dateRangeInput("dateRange_4", "Order Date:",
+                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
+                                              ),
+                                              column(width = 9,
+                                                     dataTableOutput("pivot2")))),
+                                   
                                    tabPanel("Fail Status Plot",
                                             rpivotTableOutput("stackedbarplot")
                                    )
@@ -187,6 +193,9 @@ server <- function(input, output, session) {
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
         updateDateRangeInput(session, "dateRange_3", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        updateDateRangeInput(session, "dateRange_4", 
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
       } else {
@@ -360,7 +369,6 @@ server <- function(input, output, session) {
       summarise(Count = n_distinct(`CustomerName`)) %>%
       arrange(desc(Count))
     
-    # Create ggplot bar plot with enhancements
     ggplot(barplot_data, aes(x = reorder(`Profile name`, -Count), y = Count, fill = Count)) +
       geom_bar(stat = "identity") +
       scale_fill_gradient(low = "lightblue", high = "blue") +  
@@ -387,16 +395,44 @@ server <- function(input, output, session) {
   
   
   
-  output$pivot2 <- renderRpivotTable({
-    rpivotTable(data = data_to_display(),
-                rows = "Profile name",
-                cols = "Fail",
-                vals = "CustomerName",
-                aggregatorName = "Count",
-                rendererName = "Table",
-                width="100%",
-                height="400px")
+  output$pivot2 <- renderDataTable({
+    fail_status_data <- data_to_display() %>%
+      filter(OrderDate >= input$dateRange_4[1] & OrderDate <= input$dateRange_4[2]) %>%
+      group_by(`Profile name`, Fail) %>%
+      summarise(Count = n(), .groups = 'drop') %>%
+      pivot_wider(names_from = Fail, values_from = Count, values_fill = list(Count = 0)) %>%
+      replace_na(list(Yes = 0, No = 0)) 
+    
+    totals <- fail_status_data %>%
+      summarise(across(-`Profile name`, sum, na.rm = TRUE))
+    
+    totals$`Profile name` <- "Total"
+    
+    fail_status_data <- bind_rows(totals, fail_status_data)
+    fail_status_data <- fail_status_data %>% 
+      relocate(`Profile name`)
+    
+    datatable(fail_status_data, 
+              extensions = c("Buttons", "FixedHeader"), 
+              options = list(pageLength = 5000,
+                             dom = "Blfrtip",
+                             buttons = c("copy", "csv", "excel"),
+                             scrollX = TRUE,
+                             scrollY = "1500px",
+                             fixedHeader = TRUE,
+                             fixedColumns = list(leftColumns = 2)), 
+              rownames = FALSE) %>%
+      formatStyle(
+        columns = 1:ncol(fail_status_data),
+        fontWeight = styleEqual("Total", "bold"),
+        backgroundColor = styleEqual("Total", "#f2f2f2"),
+        target = "row"
+      )
   })
+  
+  
+  
+  
   
   output$stackedbarplot <- renderRpivotTable({
     rpivotTable(data = data_to_display(),
