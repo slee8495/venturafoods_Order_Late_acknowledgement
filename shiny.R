@@ -1,4 +1,3 @@
-# Load required libraries
 library(tidyverse)
 library(shiny)
 library(readr)
@@ -116,8 +115,15 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                      dataTableOutput("pivot2")))),
                                    
                                    tabPanel("Fail Status Plot",
-                                            rpivotTableOutput("stackedbarplot")
-                                   )
+                                            br(),
+                                            fluidRow(
+                                              column(width = 3,
+                                                     dateRangeInput("dateRange_5", "Order Date:",
+                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
+                                              ),
+                                              column(width = 9,
+                                                     plotOutput("stackedbarplot")))),
                                  )
                         ),
                         tabPanel("Not Acknowledged",
@@ -196,6 +202,9 @@ server <- function(input, output, session) {
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
         updateDateRangeInput(session, "dateRange_4", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        updateDateRangeInput(session, "dateRange_5", 
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
       } else {
@@ -331,7 +340,7 @@ server <- function(input, output, session) {
       filter(OrderDate >= selected_dates_2[1] & OrderDate <= selected_dates_2[2]) %>%
       filter(Fail %in% input$failFilter) %>%  
       group_by(`Profile name`) %>%
-      summarise(Count = n_distinct(`CustomerName`)) %>%
+      summarise(Count = n(), .groups = 'drop') %>%
       arrange(desc(Count))
     
     datatable(pivot1_data, 
@@ -366,15 +375,15 @@ server <- function(input, output, session) {
       filter(OrderDate >= input$dateRange_3[1] & OrderDate <= input$dateRange_3[2]) %>%
       filter(Fail %in% input$failFilter_2) %>%  
       group_by(`Profile name`) %>%
-      summarise(Count = n_distinct(`CustomerName`)) %>%
+      summarise(Count = n(), .groups = 'drop') %>%
       arrange(desc(Count))
     
     ggplot(barplot_data, aes(x = reorder(`Profile name`, -Count), y = Count, fill = Count)) +
       geom_bar(stat = "identity") +
       scale_fill_gradient(low = "lightblue", high = "blue") +  
-      geom_text(aes(label = Count), vjust = -0.3, size = 3.5) + 
+      geom_text(aes(label = Count), position = position_stack(vjust = 0.5), size = 4.5, color = "white", fontface = "bold") + 
       theme_classic() +
-      labs(y = "Count", x = "Profile name", title = "Non Compliance to Order Acknowledgement") +
+      labs(y = "", x = "", title = "Non Compliance to Order Acknowledgement") +
       theme(
         axis.text.x = element_text(angle = 45, hjust = 1, size = 12, face = "bold"),
         axis.text.y = element_text(size = 10, face = "bold"),
@@ -434,16 +443,41 @@ server <- function(input, output, session) {
   
   
   
-  output$stackedbarplot <- renderRpivotTable({
-    rpivotTable(data = data_to_display(),
-                rows = "Fail",
-                cols = "Profile name",
-                vals = "CustomerName",
-                aggregatorName = "Count",
-                rendererName = "Stacked Bar Chart",
-                width="100%",
-                height="400px")
-  })
+  output$stackedbarplot <- renderPlot({
+    stacked_bar_data <- data_to_display() %>%
+      filter(OrderDate >= input$dateRange_5[1] & OrderDate <= input$dateRange_5[2]) %>%
+      group_by(`Profile name`, Fail) %>%
+      summarise(Count = n(), .groups = 'drop') %>%
+      mutate(Fail = factor(Fail, levels = c("Yes", "No"))) 
+    
+    totals <- stacked_bar_data %>%
+      group_by(`Profile name`) %>%
+      summarise(Total = sum(Count)) %>%
+      arrange(desc(Total))
+    
+    stacked_bar_data <- stacked_bar_data %>%
+      inner_join(totals, by = "Profile name") %>%
+      arrange(desc(Total))
+    
+    # Create ggplot2 stacked bar plot with labels
+    ggplot(stacked_bar_data, aes(x = reorder(`Profile name`, -Total), y = Count, fill = Fail)) +
+      geom_bar(stat = "identity", position = "stack") +
+      geom_text(aes(label = Count), position = position_stack(vjust = 0.5), size = 4.5, color = "white", fontface = "bold") +
+      theme_classic() +
+      labs(x = "", y = "", fill = "Fail Status", 
+           title = "Profile Name vs Count by Fail Status") +
+      scale_fill_manual(values = c("Yes" = "#1f77b4", "No" = "#ff7f0e")) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12, face = "bold"),
+            axis.text.y = element_text(size = 12, face = "bold"),
+            axis.title.x = element_text(size = 14, face = "bold"),
+            axis.title.y = element_text(size = 14, face = "bold"),
+            plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+            legend.text = element_text(size = 12, face = "bold"),
+            legend.title = element_text(size = 14, face = "bold")) 
+  }, width = 1300, height = 800)
+  
+  
+  
   
   output$pivot3 <- renderRpivotTable({
     rpivotTable(data = data_to_display(),
