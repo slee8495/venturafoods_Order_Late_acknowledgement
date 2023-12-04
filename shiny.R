@@ -165,7 +165,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             br(),
                                             fluidRow(
                                               column(width = 3,
-                                                     pickerInput("weekFilter", "Order Date:",
+                                                     pickerInput("weekFilter", "Week:",
                                                                  choices = sort(unique(cleaned_default_data$Week)),
                                                                  selected = unique(cleaned_default_data$Week),
                                                                  multiple = TRUE)

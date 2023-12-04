@@ -66,7 +66,7 @@ data_info <- function() {
 }
 
 # Default Data 
-raw_data_as400 <- read_csv("SUM348094.CSV")
+raw_data_as400 <- read_csv("SUM471252.CSV")
 cleaned_default_data <- clean_data(raw_data_as400)
 
 
