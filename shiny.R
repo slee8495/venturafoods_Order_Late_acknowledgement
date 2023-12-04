@@ -127,14 +127,20 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                  )
                         ),
                         tabPanel("Not Acknowledged",
+                                 br(),
                                  fluidRow(
-                                   column(width = 12, 
-                                          rpivotTableOutput("pivot3")
+                                   column(width = 3, 
+                                          pickerInput("profilename", "Profile Name:",
+                                                      choices = sort(unique(cleaned_default_data$`Profile name`)),
+                                                      selected = unique(cleaned_default_data$`Profile name`),
+                                                      options = list(`actions-box` = TRUE, `live-search` = TRUE), 
+                                                      multiple = TRUE),
+                                          dateRangeInput("dateRange_6", "Order Date:",
+                                                         start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                         end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
                                    ),
-                                   div(style = "position: absolute; top: 52px; right: 1000px;", 
-                                       tags$p("Please ensure that you unselect \"E\" from the \"Order ack\" field in the left panel. Please ensure to sort by clicking \"⭥\" or \"⭤\" button", 
-                                              style = "font-size: 12px; font-weight; bold; color: red;")
-                                   ),
+                                   column(width = 9,
+                                          dataTableOutput("pivot3"))
                                    
                                  )
                         ),
@@ -169,6 +175,10 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         
                         
 )
+
+
+
+
 
 # Server logic
 server <- function(input, output, session) {
@@ -205,6 +215,9 @@ server <- function(input, output, session) {
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
         updateDateRangeInput(session, "dateRange_5", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        updateDateRangeInput(session, "dateRange_6", 
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
       } else {
@@ -325,7 +338,7 @@ server <- function(input, output, session) {
       formatStyle(
         columns = 1:ncol(pivot_data),
         fontWeight = styleEqual("Total", "bold"),
-        backgroundColor = styleEqual("Total", "#f2f2f2"),
+        backgroundColor = styleEqual("Total", "lightyellow"),
         target = "row"
       )
   })
@@ -434,7 +447,7 @@ server <- function(input, output, session) {
       formatStyle(
         columns = 1:ncol(fail_status_data),
         fontWeight = styleEqual("Total", "bold"),
-        backgroundColor = styleEqual("Total", "#f2f2f2"),
+        backgroundColor = styleEqual("Total", "lightyellow"),
         target = "row"
       )
   })
@@ -479,16 +492,46 @@ server <- function(input, output, session) {
   
   
   
-  output$pivot3 <- renderRpivotTable({
-    rpivotTable(data = data_to_display(),
-                rows = c("OrderDate", "Profile name"),
-                filters = c("Order ack"),  
-                vals = "Enter by name",
-                aggregatorName = "Count",
-                rendererName = "Table",
-                width="100%",
-                height="400px")
+  
+  output$pivot3 <- renderDataTable({
+    pivot3_data <- data_to_display() %>%
+      filter(OrderDate >= input$dateRange_6[1] & OrderDate <= input$dateRange_6[2]) %>%
+      filter(`Order ack` != "E") %>%
+      group_by(OrderDate, `Profile name`) %>%
+      summarise(Count = n(), .groups = 'drop') %>% 
+      mutate(OrderDate = as.character(OrderDate))
+    
+    totals <- tibble(
+      OrderDate = "Total", 
+      `Profile name` = "Total",
+      Count = sum(pivot3_data$Count, na.rm = TRUE)
+    )
+    
+    # Append the total row at the top
+    pivot3_data <- bind_rows(totals, pivot3_data)
+    
+    
+    datatable(pivot3_data, 
+              extensions = c("Buttons", "FixedHeader"), 
+              options = list(pageLength = 5000,
+                             dom = "Blfrtip",
+                             buttons = c("copy", "csv", "excel"),
+                             scrollX = TRUE,
+                             scrollY = "1500px",
+                             fixedHeader = TRUE,
+                             fixedColumns = list(leftColumns = 2)), 
+              rownames = FALSE) %>% 
+      formatStyle(
+        columns = 1:ncol(pivot3_data),
+        fontWeight = styleEqual("Total", "bold"),
+        backgroundColor = styleEqual("Total", "lightyellow"),
+        target = "row"
+      )
   })
+  
+  
+  
+  
   
   output$pieChart <- renderPlot({
     pie_data <- data_to_display() %>% 
