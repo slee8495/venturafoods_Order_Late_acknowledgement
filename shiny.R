@@ -148,26 +148,56 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         tabPanel("Overall Process Summary",
                                  tabsetPanel(
                                    tabPanel("Fail Distribution - Pie Chart",
-                                            tags$br(),
-                                            tags$br(),
-                                            plotOutput("pieChart")
+                                            br(),
+                                            br(),
+                                            fluidRow(
+                                              column(width = 3,
+                                                     dateRangeInput("dateRange_7", "Order Date:",
+                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
+                                            ),
+                                            column(width = 9,
+                                                   plotOutput("pieChart")))
+                                            
                                    ),
                                    tabPanel("Stacked Bar Chart",
-                                            tags$br(),
-                                            tags$br(),
-                                            plotOutput("stackedBar")
+                                            br(),
+                                            br(),
+                                            fluidRow(
+                                              column(width = 3,
+                                                     pickerInput("weekFilter", "Order Date:",
+                                                                 choices = sort(unique(cleaned_default_data$Week)),
+                                                                 selected = unique(cleaned_default_data$Week),
+                                                                 multiple = TRUE)
+                                              ),
+                                              column(width = 9,
+                                                     plotOutput("stackedBar")))
                                    ),
                                    tabPanel("Line Graph",
-                                            tags$br(),
-                                            tags$br(),
-                                            plotOutput("lineGraph")
+                                            br(),
+                                            br(),
+                                            fluidRow(
+                                              column(width = 3,
+                                                     dateRangeInput("dateRange_8", "Order Date:",
+                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
+                                              ),
+                                              column(width = 9,
+                                                     plotOutput("lineGraph")))
                                    ),
                                    tabPanel("Order Date Average Graph",
-                                            selectInput("Fail", "Select Fail Status:", 
-                                                        choices = unique(cleaned_default_data$Fail),
-                                                        selected = unique(cleaned_default_data$Fail),
-                                                        multiple = TRUE),
-                                            plotOutput("avgGraph")
+                                            br(),
+                                            br(),
+                                            fluidRow(
+                                              column(width = 3,
+                                                     pickerInput("Fail", "Select Fail Status:", 
+                                                                 choices = unique(cleaned_default_data$Fail),
+                                                                 selected = unique(cleaned_default_data$Fail),
+                                                                 multiple = TRUE)),
+                                            
+                                            column(width = 9,
+                                                   plotOutput("avgGraph")))
+                                            
                                             
                                    )
                                  )
@@ -220,6 +250,13 @@ server <- function(input, output, session) {
         updateDateRangeInput(session, "dateRange_6", 
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        updateDateRangeInput(session, "dateRange_7", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        updateDateRangeInput(session, "dateRange_7", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        
       } else {
         showModal(
           modalDialog(
@@ -536,30 +573,38 @@ server <- function(input, output, session) {
   
   output$pieChart <- renderPlot({
     pie_data <- data_to_display() %>% 
+      filter(OrderDate >= input$dateRange_7[1] & OrderDate <= input$dateRange_7[2]) %>%
       group_by(Fail) %>% 
-      summarise(Count = n_distinct(`CustomerName`))
+      summarise(Count = n())
     
-    ggplot2::ggplot(pie_data, ggplot2::aes(x = "", y = Count, fill = Fail)) +
-      ggplot2::geom_bar(stat = "identity", width = 1) +
-      ggplot2::coord_polar(theta = "y") +
-      ggplot2::labs(fill = "Fail", title = paste("Fail Distribution")) +
-      ggplot2::geom_text(aes(label = scales::percent(Count/sum(Count))), position = position_stack(vjust = 0.5), size = 5, fontface = "bold") + 
-      ggplot2::theme_minimal() +
-      ggplot2::theme(axis.title.x=element_blank(),
-                     axis.text.x=element_blank(),
-                     axis.ticks.x=element_blank(),
-                     axis.title.y=element_blank(),
-                     axis.text.y=element_blank(),
-                     axis.ticks.y=element_blank(),
-                     plot.title = ggplot2::element_text(size = 20, face = "bold"),
-                     legend.text = ggplot2::element_text(size = 12)) 
+
+    ggplot(pie_data, aes(x = "", y = Count, fill = Fail)) +
+      geom_bar(stat = "identity", width = 1) +
+      coord_polar(theta = "y") +
+      labs(fill = "Fail", title = expression(bold("Fail Distribution"))) +
+      geom_text(aes(label = scales::percent(Count/sum(Count))),
+                position = position_stack(vjust = 0.5),
+                size = 5, fontface = "bold") + 
+      theme_minimal() +
+      theme(axis.title.x = element_blank(),
+            axis.text.x = element_blank(),
+            axis.ticks.x = element_blank(),
+            axis.title.y = element_blank(),
+            axis.text.y = element_blank(),
+            axis.ticks.y = element_blank(),
+            plot.title = element_text(size = 20, face = "bold", family = "Your_Font_Family"),
+            legend.text = element_text(size = 14, face = "bold")) +
+      scale_fill_manual(values = c("Yes" = "#66B2FF", "No" = "#FF9999")) 
   })
+  
+  
   
   output$stackedBar <- renderPlot({
     bar_data <- data_to_display() %>%
+      filter(Week %in% input$weekFilter) %>%  
       dplyr::filter(!is.na(Week)) %>%
       group_by(Week, Fail) %>%
-      summarise(Count = n_distinct(CustomerName)) %>%
+      summarise(Count = n()) %>%
       ungroup()
     
     
@@ -584,22 +629,29 @@ server <- function(input, output, session) {
       ggplot2::geom_bar(stat = "identity", position = "stack") +
       ggplot2::geom_text(aes(label = sprintf("%.1f%%", Percentage), y = CumulativePercentage), 
                          size = 6, face = "bold", color = "black") +
-      ggplot2::labs(y = "Percentage (%)", x = "Week", fill = "Fail") +
+      ggplot2::labs(y = "Percentage (%)", x = "Week", fill = "Fail",
+                    title = "Fail Distribution by Week") +
       ggplot2::theme_classic() +
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(face = "bold", size = 12),
         axis.text.y = ggplot2::element_text(face = "bold", size = 12),
         axis.title.x = ggplot2::element_text(face = "bold", size = 14),
-        axis.title.y = ggplot2::element_text(face = "bold", size = 14)
-      )
+        axis.title.y = ggplot2::element_text(face = "bold", size = 14),
+        legend.text = ggplot2::element_text(face = "bold", size = 16),
+        plot.title = ggplot2::element_text(face = "bold", size = 18, family = "Your_Font_Family"),
+        legend.title = ggplot2::element_text(face = "bold", size = 16)
+      ) +
+      ggplot2::scale_fill_manual(values = c("Yes" = "#66B2FF", "No" = "#FF9999"))
+    
   })
   
   
   
   output$lineGraph <- renderPlot({
     line_data <- data_to_display() %>%
+      filter(OrderDate >= input$dateRange_8[1] & OrderDate <= input$dateRange_8[2]) %>%
       group_by(`OrderDate`, Fail) %>%
-      summarise(Count = n_distinct(CustomerName)) %>%
+      summarise(Count = n()) %>%
       ungroup()
     
     
@@ -609,7 +661,7 @@ server <- function(input, output, session) {
       ggplot2::geom_line(size = 1) +
       ggplot2::geom_text(aes(label = Count), vjust = -0.5, size = 5, fontface = "bold") +  
       ggplot2::theme_classic() +
-      ggplot2::labs(y = "Number of Customers", x = "OrderDate", color = "Fail Status") +
+      ggplot2::labs(title = "Fail Distribution by number of Customers over Time", y = "Number of Customers", x = "OrderDate", color = "Fail Status") +
       ggplot2::ylim(0, max(line_data$Count, na.rm = TRUE) + 1) +  
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
@@ -618,22 +670,17 @@ server <- function(input, output, session) {
         axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
         legend.title = ggplot2::element_text(size = 16, face = "bold"),
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
-        legend.key.size = unit(1.5, "cm")  
-        
-      )
+        legend.key.size = unit(1.5, "cm"),
+        plot.title = ggplot2::element_text(face = "bold", size = 18, family = "Your_Font_Family")) +
+      ggplot2::scale_color_manual(values = c("Yes" = "#66B2FF", "No" = "#FF9999"))
+    
     print(p)
   })
   
   output$avgGraph <- renderPlot({
-    avg_data <- data_to_display() 
     
-    
-    if (!is.null(input$Fail)) {
-      avg_data <- avg_data %>%
-        dplyr::filter(Fail %in% input$Fail)
-    }
-    
-    avg_data <- avg_data %>%
+    avg_data <- data_to_display()  %>%
+      dplyr::filter(Fail %in% input$Fail) %>% 
       dplyr::group_by(`OrderDate`) %>%
       dplyr::mutate(`Days to acknowledge` = as.numeric(`Days to acknowledge`)) %>% 
       dplyr::summarise(
@@ -648,9 +695,9 @@ server <- function(input, output, session) {
     
     last_date <- tail(levels(avg_data$`OrderDate`), 1) 
     
-    p <- ggplot2::ggplot(avg_data, ggplot2::aes(x = `OrderDate`, y = Value, color = Metric, group = Metric)) +
+    ggplot2::ggplot(avg_data, ggplot2::aes(x = OrderDate, y = Value, color = Metric, group = Metric)) +
       ggplot2::geom_line(size = 1) +
-      ggplot2::geom_text(aes(label=sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  
+      ggplot2::geom_text(aes(label = sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  
       ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  
       ggplot2::theme_classic() +
       ggplot2::labs(y = "Value", x = "OrderDate", color = "Metric") +
@@ -661,10 +708,9 @@ server <- function(input, output, session) {
         axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
         legend.title = ggplot2::element_text(size = 16, face = "bold"),
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
-        legend.key.size = unit(1.5, "cm") 
-        
+        legend.key.size = ggplot2::unit(1.5, "cm")  # Removed 'unit' function
       )
-    print(p)
+
   })
   
   
