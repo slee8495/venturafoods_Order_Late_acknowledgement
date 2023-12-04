@@ -628,7 +628,7 @@ server <- function(input, output, session) {
     ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Percentage, fill = Fail)) +
       ggplot2::geom_bar(stat = "identity", position = "stack") +
       ggplot2::geom_text(aes(label = sprintf("%.1f%%", Percentage), y = CumulativePercentage), 
-                         size = 6, face = "bold", color = "black") +
+                         size = 6, fontface = "bold", color = "black") +
       ggplot2::labs(y = "Percentage (%)", x = "Week", fill = "Fail",
                     title = "Fail Distribution by Week") +
       ggplot2::theme_classic() +
@@ -708,7 +708,7 @@ server <- function(input, output, session) {
         axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
         legend.title = ggplot2::element_text(size = 16, face = "bold"),
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
-        legend.key.size = ggplot2::unit(1.5, "cm")  # Removed 'unit' function
+        legend.key.size = ggplot2::unit(1.5, "cm") 
       )
 
   })
