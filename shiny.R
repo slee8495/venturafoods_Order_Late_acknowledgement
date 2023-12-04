@@ -168,6 +168,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                      pickerInput("weekFilter", "Week:",
                                                                  choices = sort(unique(cleaned_default_data$Week)),
                                                                  selected = unique(cleaned_default_data$Week),
+                                                                 options = list(`actions-box` = TRUE), 
                                                                  multiple = TRUE)
                                               ),
                                               column(width = 9,
