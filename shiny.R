@@ -490,7 +490,7 @@ server <- function(input, output, session) {
   }, width = 1300, height = 800)
   
   
-  
+   
   
   
   output$pivot3 <- renderDataTable({
