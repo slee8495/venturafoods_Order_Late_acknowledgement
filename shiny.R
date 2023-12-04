@@ -496,6 +496,7 @@ server <- function(input, output, session) {
   output$pivot3 <- renderDataTable({
     pivot3_data <- data_to_display() %>%
       filter(OrderDate >= input$dateRange_6[1] & OrderDate <= input$dateRange_6[2]) %>%
+      filter(`Profile name` %in% input$profilename) %>%  
       filter(`Order ack` != "E") %>%
       group_by(OrderDate, `Profile name`) %>%
       summarise(Count = n(), .groups = 'drop') %>% 
