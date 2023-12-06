@@ -47,7 +47,11 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         ),
                         tabPanel("View Data",
                                  br(),
-                                 br(),
+                                 pickerInput("ackFlagFilter", "Order Acknowledgement Flag:", 
+                                             choices = sort(unique(cleaned_default_data$`Order Acknowledgement Flag`)),
+                                             selected = unique(cleaned_default_data$`Order Acknowledgement Flag`), 
+                                             multiple = TRUE,
+                                             options = list(`actions-box` = TRUE)),
                                  fluidRow(
                                    column(width = 12, 
                                           dataTableOutput("viewData"),
@@ -80,8 +84,8 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             fluidRow(
                                               column(width = 3,
                                                      pickerInput("failFilter", "Fail Status:", 
-                                                                 choices = sort(unique(cleaned_default_data$Fail)),
-                                                                 selected = cleaned_default_data$Fail[1], multiple = TRUE),
+                                                                 choices = sort(unique(cleaned_default_data$`On Time`)),
+                                                                 selected = cleaned_default_data$`On Time`[2], multiple = TRUE),
                                                      dateRangeInput("dateRange_2", "Order Date:",
                                                                     start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
                                                                     end = max(cleaned_default_data$OrderDate, na.rm = TRUE))),
@@ -94,8 +98,8 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             fluidRow(
                                               column(width = 3,
                                                      pickerInput("failFilter_2", "Fail Status:", 
-                                                                 choices = sort(unique(cleaned_default_data$Fail)),
-                                                                 selected = cleaned_default_data$Fail[1], multiple = TRUE),
+                                                                 choices = sort(unique(cleaned_default_data$`On Time`)),
+                                                                 selected = cleaned_default_data$`On Time`[2], multiple = TRUE),
                                                      dateRangeInput("dateRange_3", "Order Date:",
                                                                     start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
                                                                     end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
@@ -126,24 +130,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                      plotOutput("stackedbarplot")))),
                                  )
                         ),
-                        tabPanel("Not Acknowledged",
-                                 br(),
-                                 fluidRow(
-                                   column(width = 3, 
-                                          pickerInput("profilename", "Profile Name:",
-                                                      choices = sort(unique(cleaned_default_data$`Profile name`)),
-                                                      selected = unique(cleaned_default_data$`Profile name`),
-                                                      options = list(`actions-box` = TRUE, `live-search` = TRUE), 
-                                                      multiple = TRUE),
-                                          dateRangeInput("dateRange_6", "Order Date:",
-                                                         start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
-                                                         end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
-                                   ),
-                                   column(width = 9,
-                                          dataTableOutput("pivot3"))
-                                   
-                                 )
-                        ),
+                        
                         
                         tabPanel("Overall Process Summary",
                                  tabsetPanel(
@@ -155,9 +142,9 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                      dateRangeInput("dateRange_7", "Order Date:",
                                                                     start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
                                                                     end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
-                                            ),
-                                            column(width = 9,
-                                                   plotOutput("pieChart")))
+                                              ),
+                                              column(width = 9,
+                                                     plotOutput("pieChart")))
                                             
                                    ),
                                    tabPanel("Stacked Bar Chart",
@@ -192,12 +179,12 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             fluidRow(
                                               column(width = 3,
                                                      pickerInput("Fail", "Select Fail Status:", 
-                                                                 choices = unique(cleaned_default_data$Fail),
-                                                                 selected = unique(cleaned_default_data$Fail),
+                                                                 choices = unique(cleaned_default_data$`On Time`),
+                                                                 selected = unique(cleaned_default_data$`On Time`[2]),
                                                                  multiple = TRUE)),
-                                            
-                                            column(width = 9,
-                                                   plotOutput("avgGraph")))
+                                              
+                                              column(width = 9,
+                                                     plotOutput("avgGraph")))
                                             
                                             
                                    )
@@ -318,7 +305,11 @@ server <- function(input, output, session) {
   )
   
   output$viewData <- renderDataTable({
-    datatable(data_to_display(), extensions = 'Buttons', 
+    
+    view_data_filtered <- data_to_display() %>% 
+      filter(`Order Acknowledgement Flag` %in% input$ackFlagFilter) 
+    
+    datatable(view_data_filtered, extensions = 'Buttons', 
               options = list(
                 pageLength = 100,
                 scrollX = TRUE,
@@ -342,25 +333,32 @@ server <- function(input, output, session) {
     pivot_data <- data_to_display() %>%
       filter(OrderDate >= selected_dates[1] & OrderDate <= selected_dates[2]) %>%
       filter(CustomerName %in% input$customerSummaryPicker | length(input$customerSummaryPicker) == 0) %>%
-      group_by(CustomerName, Fail) %>%
+      group_by(CustomerName, `On Time`) %>%
       summarise(Count = n(), .groups = 'drop') %>% 
-      pivot_wider(names_from = Fail, values_from = Count, values_fill = list(Count = 0)) 
+      pivot_wider(names_from = `On Time`, values_from = Count, values_fill = list(Count = 0)) 
     
-    if (!"Yes" %in% names(pivot_data)) {
-      pivot_data$Yes <- 0
+    if (!"Not on Time" %in% names(pivot_data)) {
+      pivot_data$`Not on Time` <- 0
     }
-    if (!"No" %in% names(pivot_data)) {
-      pivot_data$No <- 0
+    if (!"On Time" %in% names(pivot_data)) {
+      pivot_data$`On Time` <- 0
     }
     
     column_totals <- colSums(select(pivot_data, -CustomerName), na.rm = TRUE)
-    total_row <- data.frame(CustomerName = "Total", t(column_totals))
+    total_row <- data.frame(CustomerName = "Total", t(column_totals)) %>%
+      mutate(`Not on Time` = Not.on.Time,
+             `On Time` = On.Time) %>%
+      select(-Not.on.Time, -On.Time)
     
-    pivot_data <- bind_rows(total_row, pivot_data) %>% 
-      mutate(yes_no = Yes + No,
-             Yes = Yes / yes_no * 1,
-             No = No / yes_no * 1) %>% 
+    pivot_data <- bind_rows(total_row, pivot_data) %>%
+      mutate(yes_no = `Not on Time` + `On Time`,
+             `Not on Time` = `Not on Time` / yes_no * 1,
+             `On Time` = `On Time` / yes_no * 1) %>%
       select(-yes_no)
+    
+    pivot_data <- pivot_data %>% 
+      mutate(`Not on Time` = scales::percent(`Not on Time`, accuracy = 0.01),
+             `On Time` = scales::percent(`On Time`, accuracy = 0.01))
     
     datatable(pivot_data, 
               extensions = c("Buttons", "FixedHeader"), 
@@ -372,7 +370,6 @@ server <- function(input, output, session) {
                              fixedHeader = TRUE,
                              fixedColumns = list(leftColumns = 2)), 
               rownames = FALSE) %>%
-      formatPercentage(columns = c("Yes", "No"), digits = 2) %>%
       formatStyle(
         columns = 1:ncol(pivot_data),
         fontWeight = styleEqual("Total", "bold"),
@@ -389,7 +386,7 @@ server <- function(input, output, session) {
     
     pivot1_data <- data_to_display() %>%
       filter(OrderDate >= selected_dates_2[1] & OrderDate <= selected_dates_2[2]) %>%
-      filter(Fail %in% input$failFilter) %>%  
+      filter(`On Time` %in% input$failFilter) %>%  
       group_by(`Profile name`) %>%
       summarise(Count = n(), .groups = 'drop') %>%
       arrange(desc(Count))
@@ -408,8 +405,8 @@ server <- function(input, output, session) {
   
   observeEvent(input$file1, {
     updatePickerInput(session, "failFilter", 
-                      choices = unique(data_to_display()$Fail),
-                      selected = unique(data_to_display()$Fail[1]))
+                      choices = unique(data_to_display()$`On Time`),
+                      selected = unique(data_to_display()$`On Time`[2]))
   })
   
   
@@ -424,7 +421,7 @@ server <- function(input, output, session) {
     
     barplot_data <- data_to_display() %>%
       filter(OrderDate >= input$dateRange_3[1] & OrderDate <= input$dateRange_3[2]) %>%
-      filter(Fail %in% input$failFilter_2) %>%  
+      filter(`On Time` %in% input$failFilter_2) %>%  
       group_by(`Profile name`) %>%
       summarise(Count = n(), .groups = 'drop') %>%
       arrange(desc(Count))
@@ -448,8 +445,8 @@ server <- function(input, output, session) {
   
   observeEvent(input$file1, {
     updatePickerInput(session, "failFilter_2", 
-                      choices = unique(data_to_display()$Fail),
-                      selected = unique(data_to_display()$Fail[1]))
+                      choices = unique(data_to_display()$`On Time`),
+                      selected = unique(data_to_display()$`On Time`[2]))
   })
   
   
@@ -458,10 +455,10 @@ server <- function(input, output, session) {
   output$pivot2 <- renderDataTable({
     fail_status_data <- data_to_display() %>%
       filter(OrderDate >= input$dateRange_4[1] & OrderDate <= input$dateRange_4[2]) %>%
-      group_by(`Profile name`, Fail) %>%
+      group_by(`Profile name`, `On Time`) %>%
       summarise(Count = n(), .groups = 'drop') %>%
-      pivot_wider(names_from = Fail, values_from = Count, values_fill = list(Count = 0)) %>%
-      replace_na(list(Yes = 0, No = 0)) 
+      pivot_wider(names_from = `On Time`, values_from = Count, values_fill = list(Count = 0)) %>%
+      replace_na(list(`Not on Time` = 0, `On Time` = 0)) 
     
     totals <- fail_status_data %>%
       summarise(across(-`Profile name`, sum, na.rm = TRUE))
@@ -497,9 +494,10 @@ server <- function(input, output, session) {
   output$stackedbarplot <- renderPlot({
     stacked_bar_data <- data_to_display() %>%
       filter(OrderDate >= input$dateRange_5[1] & OrderDate <= input$dateRange_5[2]) %>%
-      group_by(`Profile name`, Fail) %>%
-      summarise(Count = n(), .groups = 'drop') %>%
-      mutate(Fail = factor(Fail, levels = c("Yes", "No"))) 
+      group_by(`Profile name`, `On Time`) %>%
+      summarise(Count = n(), .groups = 'drop') 
+    
+    
     
     totals <- stacked_bar_data %>%
       group_by(`Profile name`) %>%
@@ -508,16 +506,17 @@ server <- function(input, output, session) {
     
     stacked_bar_data <- stacked_bar_data %>%
       inner_join(totals, by = "Profile name") %>%
-      arrange(desc(Total))
+      arrange(desc(Total)) 
+    
     
     # Create ggplot2 stacked bar plot with labels
-    ggplot(stacked_bar_data, aes(x = reorder(`Profile name`, -Total), y = Count, fill = Fail)) +
+    ggplot(stacked_bar_data, aes(x = reorder(`Profile name`, -Total), y = Count, fill = `On Time`)) +
       geom_bar(stat = "identity", position = "stack") +
       geom_text(aes(label = Count), position = position_stack(vjust = 0.5), size = 4.5, color = "white", fontface = "bold") +
       theme_classic() +
       labs(x = "", y = "", fill = "Fail Status", 
            title = "Profile Name vs Count by Fail Status") +
-      scale_fill_manual(values = c("Yes" = "#1f77b4", "No" = "#ff7f0e")) +
+      scale_fill_manual(values = c(`On Time` = "#1f77b4", `Not on Time` = "#ff7f0e")) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12, face = "bold"),
             axis.text.y = element_text(size = 12, face = "bold"),
             axis.title.x = element_text(size = 14, face = "bold"),
@@ -528,46 +527,6 @@ server <- function(input, output, session) {
   }, width = 1300, height = 800)
   
   
-   
-  
-  
-  output$pivot3 <- renderDataTable({
-    pivot3_data <- data_to_display() %>%
-      filter(OrderDate >= input$dateRange_6[1] & OrderDate <= input$dateRange_6[2]) %>%
-      filter(`Profile name` %in% input$profilename) %>%  
-      filter(`Order ack` != "E") %>%
-      group_by(OrderDate, `Profile name`) %>%
-      summarise(Count = n(), .groups = 'drop') %>% 
-      mutate(OrderDate = as.character(OrderDate))
-    
-    totals <- tibble(
-      OrderDate = "Total", 
-      `Profile name` = "Total",
-      Count = sum(pivot3_data$Count, na.rm = TRUE)
-    )
-    
-    # Append the total row at the top
-    pivot3_data <- bind_rows(totals, pivot3_data)
-    
-    
-    datatable(pivot3_data, 
-              extensions = c("Buttons", "FixedHeader"), 
-              options = list(pageLength = 5000,
-                             dom = "Blfrtip",
-                             buttons = c("copy", "csv", "excel"),
-                             scrollX = TRUE,
-                             scrollY = "1500px",
-                             fixedHeader = TRUE,
-                             fixedColumns = list(leftColumns = 2)), 
-              rownames = FALSE) %>% 
-      formatStyle(
-        columns = 1:ncol(pivot3_data),
-        fontWeight = styleEqual("Total", "bold"),
-        backgroundColor = styleEqual("Total", "lightyellow"),
-        target = "row"
-      )
-  })
-  
   
   
   
@@ -575,14 +534,14 @@ server <- function(input, output, session) {
   output$pieChart <- renderPlot({
     pie_data <- data_to_display() %>% 
       filter(OrderDate >= input$dateRange_7[1] & OrderDate <= input$dateRange_7[2]) %>%
-      group_by(Fail) %>% 
+      group_by(`On Time`) %>% 
       summarise(Count = n())
     
-
-    ggplot(pie_data, aes(x = "", y = Count, fill = Fail)) +
+    
+    ggplot(pie_data, aes(x = "", y = Count, fill = `On Time`)) +
       geom_bar(stat = "identity", width = 1) +
       coord_polar(theta = "y") +
-      labs(fill = "Fail", title = expression(bold("Fail Distribution"))) +
+      labs(fill = "On Time", title = expression(bold("Fail Distribution"))) +
       geom_text(aes(label = scales::percent(Count/sum(Count))),
                 position = position_stack(vjust = 0.5),
                 size = 5, fontface = "bold") + 
@@ -595,7 +554,7 @@ server <- function(input, output, session) {
             axis.ticks.y = element_blank(),
             plot.title = element_text(size = 20, face = "bold", family = "Your_Font_Family"),
             legend.text = element_text(size = 14, face = "bold")) +
-      scale_fill_manual(values = c("Yes" = "#66B2FF", "No" = "#FF9999")) 
+      scale_fill_manual(values = c(`Not on Time` = "#FF9999", `On Time` = "#66B2FF")) 
   })
   
   
@@ -604,7 +563,7 @@ server <- function(input, output, session) {
     bar_data <- data_to_display() %>%
       filter(Week %in% input$weekFilter) %>%  
       dplyr::filter(!is.na(Week)) %>%
-      group_by(Week, Fail) %>%
+      group_by(Week, `On Time`) %>%
       summarise(Count = n()) %>%
       ungroup()
     
@@ -622,15 +581,15 @@ server <- function(input, output, session) {
     
     
     bar_data <- bar_data %>%
-      arrange(Week, desc(Fail)) %>%
+      arrange(Week, desc(`On Time`)) %>%
       group_by(Week) %>%
       mutate(CumulativePercentage = cumsum(Percentage) - 0.5 * Percentage)
     
-    ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Percentage, fill = Fail)) +
+    ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Percentage, fill = `On Time`)) +
       ggplot2::geom_bar(stat = "identity", position = "stack") +
       ggplot2::geom_text(aes(label = sprintf("%.1f%%", Percentage), y = CumulativePercentage), 
                          size = 6, fontface = "bold", color = "black") +
-      ggplot2::labs(y = "Percentage (%)", x = "Week", fill = "Fail",
+      ggplot2::labs(y = "Percentage (%)", x = "", fill = "On Time",
                     title = "Fail Distribution by Week") +
       ggplot2::theme_classic() +
       ggplot2::theme(
@@ -642,7 +601,7 @@ server <- function(input, output, session) {
         plot.title = ggplot2::element_text(face = "bold", size = 18, family = "Your_Font_Family"),
         legend.title = ggplot2::element_text(face = "bold", size = 16)
       ) +
-      ggplot2::scale_fill_manual(values = c("Yes" = "#66B2FF", "No" = "#FF9999"))
+      ggplot2::scale_fill_manual(values = c(`Not on Time` = "#FF9999", `On Time` = "#66B2FF"))
     
   })
   
@@ -651,18 +610,18 @@ server <- function(input, output, session) {
   output$lineGraph <- renderPlot({
     line_data <- data_to_display() %>%
       filter(OrderDate >= input$dateRange_8[1] & OrderDate <= input$dateRange_8[2]) %>%
-      group_by(`OrderDate`, Fail) %>%
+      group_by(`OrderDate`, `On Time`) %>%
       summarise(Count = n()) %>%
       ungroup()
     
     
     line_data$`OrderDate` <- factor(line_data$`OrderDate`, levels = unique(line_data$`OrderDate`))
     
-    p <- ggplot2::ggplot(line_data, ggplot2::aes(x = `OrderDate`, y = Count, color = Fail, group = Fail)) +
+    p <- ggplot2::ggplot(line_data, ggplot2::aes(x = `OrderDate`, y = Count, color = `On Time`, group = `On Time`)) +
       ggplot2::geom_line(size = 1) +
       ggplot2::geom_text(aes(label = Count), vjust = -0.5, size = 5, fontface = "bold") +  
       ggplot2::theme_classic() +
-      ggplot2::labs(title = "Fail Distribution by number of Customers over Time", y = "Number of Customers", x = "OrderDate", color = "Fail Status") +
+      ggplot2::labs(title = "Fail Distribution by number of Customers over Time", y = "Number of Customers", x = "", color = "Fail Status") +
       ggplot2::ylim(0, max(line_data$Count, na.rm = TRUE) + 1) +  
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
@@ -673,7 +632,7 @@ server <- function(input, output, session) {
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
         legend.key.size = unit(1.5, "cm"),
         plot.title = ggplot2::element_text(face = "bold", size = 18, family = "Your_Font_Family")) +
-      ggplot2::scale_color_manual(values = c("Yes" = "#66B2FF", "No" = "#FF9999"))
+      ggplot2::scale_color_manual(values = c(`Not on Time` = "#FF9999", `On Time` = "#66B2FF"))
     
     print(p)
   })
@@ -681,7 +640,7 @@ server <- function(input, output, session) {
   output$avgGraph <- renderPlot({
     
     avg_data <- data_to_display()  %>%
-      dplyr::filter(Fail %in% input$Fail) %>% 
+      dplyr::filter(`On Time` %in% input$Fail) %>% 
       dplyr::group_by(`OrderDate`) %>%
       dplyr::mutate(`Days to acknowledge` = as.numeric(`Days to acknowledge`)) %>% 
       dplyr::summarise(
@@ -701,7 +660,7 @@ server <- function(input, output, session) {
       ggplot2::geom_text(aes(label = sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  
       ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  
       ggplot2::theme_classic() +
-      ggplot2::labs(y = "Value", x = "OrderDate", color = "Metric") +
+      ggplot2::labs(y = "Days", x = "", color = "Metric") +
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
         axis.text.y = ggplot2::element_text(size = 14, face = "bold"),
@@ -711,7 +670,7 @@ server <- function(input, output, session) {
         legend.text = ggplot2::element_text(size = 14, face = "bold"),
         legend.key.size = ggplot2::unit(1.5, "cm") 
       )
-
+    
   })
   
   
