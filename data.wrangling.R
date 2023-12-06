@@ -6,9 +6,6 @@ library(lubridate)
 
 
 
-# Assuming required libraries are already loaded
-# If not, include library(shiny), library(dplyr), etc. at the top
-
 clean_data <- function(raw_data_as400) {
   
   raw_data_as400[3, ] -> data_info
@@ -31,6 +28,10 @@ clean_data <- function(raw_data_as400) {
                   target = "2",
                   days_to_acknowledge = ifelse(!is.na(date_acknowledgement_calc) & !is.na(order_date), as.numeric(date_acknowledgement_calc - order_date), "-"),
                   fail = ifelse(days_to_acknowledge > 2, "Yes", "No")) %>% 
+    
+    plyr::mutate(`On Time` = ifelse(fail == "Yes", "Not on Time", "On Time")) %>%
+    dplyr::select(-fail) %>%
+    
     dplyr::relocate(week_number, .after = order_date) %>% 
     dplyr::mutate(across(-contains("date"), ~ifelse(is.na(.x), "-", .x))) %>% 
     dplyr::rename("Profile owner" = profile_owner,
@@ -45,15 +46,14 @@ clean_data <- function(raw_data_as400) {
                   Customer = customer,
                   OrderDate = order_date,
                   Week = week_number,
-                  "Delivery date" = delivery_date,
-                  "Ship date" = ship_date,
+                  DeliveryDate = delivery_date,
+                  ShipDate = ship_date,
                   "Detail hold code" = detail_hold_code,
-                  "Order ack" = order_ack,
+                  "Order Acknowledgement Flag" = order_ack,
                   "Date acknowledge" = date_acknowledge,
                   "Date Acknowledgement Calc." = date_acknowledgement_calc,
                   Target = target,
-                  "Days to acknowledge" = days_to_acknowledge,
-                  Fail = fail) %>% 
+                  "Days to acknowledge" = days_to_acknowledge) %>% 
     dplyr::filter(!is.na(OrderDate) & OrderDate != 0)
   
   return(cleaned_data)
