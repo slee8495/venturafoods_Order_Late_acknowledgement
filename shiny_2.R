@@ -195,7 +195,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             br(),
                                             fluidRow(
                                               column(width = 12,
-                                                     plotOutput("avgGraph", height = "700px"))  
+                                                     plotOutput("avgGraph", height = "800px"))  
                                             )
                                    )
                                    
@@ -653,40 +653,38 @@ server <- function(input, output, session) {
   
   output$avgGraph <- renderPlot({
     
-    avg_data <- data_to_display()  %>%
+    avg_data <- data_to_display() %>%
       filter(OrderDate >= input$dateRange_9[1] & OrderDate <= input$dateRange_9[2]) %>%
-      dplyr::filter(`On Time` %in% input$Fail) %>% 
+      dplyr::filter(`On Time` %in% input$Fail) %>%
       dplyr::group_by(`OrderDate`) %>%
-      dplyr::mutate(`Days to acknowledge` = as.numeric(`Days to acknowledge`)) %>% 
+      dplyr::mutate(`Days to acknowledge` = as.numeric(`Days to acknowledge`)) %>%
       dplyr::summarise(
-        Target = mean(Target, na.rm = TRUE),
         Avg_Days_to_acknowledge = mean(`Days to acknowledge`, na.rm = TRUE)
       ) %>%
-      tidyr::gather(key = "Metric", value = "Value", -`OrderDate`) %>% 
-      dplyr::mutate(Value = ifelse(Metric == "Target", 2, Value))
-    
+      tidyr::gather(key = "Metric", value = "Value", -`OrderDate`)
     
     avg_data$`OrderDate` <- factor(avg_data$`OrderDate`, levels = unique(avg_data$`OrderDate`))
     
-    last_date <- tail(levels(avg_data$`OrderDate`), 1) 
-    
-    ggplot2::ggplot(avg_data, ggplot2::aes(x = OrderDate, y = Value, color = Metric, group = Metric)) +
-      ggplot2::geom_line(size = 1) +
-      ggplot2::geom_text(aes(label = sprintf("%.2f", Value)), vjust = -0.5, size = 5, fontface = "bold") +  
-      ggplot2::ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  
-      ggplot2::theme_classic() +
-      ggplot2::labs(y = "Days", x = "", color = "Metric") +
-      ggplot2::theme(
-        axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
-        axis.text.y = ggplot2::element_text(size = 14, face = "bold"),
-        axis.title.x = ggplot2::element_text(size = 16, face = "bold"),
-        axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
-        legend.title = ggplot2::element_text(size = 16, face = "bold"),
-        legend.text = ggplot2::element_text(size = 14, face = "bold"),
-        legend.key.size = ggplot2::unit(1.5, "cm") 
+    ggplot(avg_data, aes(x = OrderDate, y = Value, color = Metric, group = Metric)) +
+      geom_line(size = 1) +
+      geom_text(aes(label = sprintf("%d", round(Value))), vjust = -0.5, size = 5, fontface = "bold", color = "black") +
+      geom_hline(yintercept = 2, linetype = "dashed", color = "lightgreen", face = "bold", size = 2) +
+      annotate("text", x = last(avg_data$OrderDate), y = 2, label = "Target: 2 days", hjust = 1, vjust = 2, color = "black", face = "bold", size = 5) +
+      ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  
+      theme_classic() +
+      labs(y = "Days", x = "", color = "Metric") +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+        axis.text.y = element_text(size = 14, face = "bold"),
+        axis.title.x = element_text(size = 16, face = "bold"),
+        axis.title.y = element_text(size = 16, face = "bold"),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 14, face = "bold"),
+        legend.key.size = unit(1.5, "cm") 
       )
-    
   })
+  
+  
   
   
   
