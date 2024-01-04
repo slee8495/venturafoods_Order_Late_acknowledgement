@@ -1,6 +1,7 @@
 library(tidyverse)
 library(shiny)
 library(readr)
+library(readxl)
 library(writexl)
 library(janitor)
 library(tidyr)
@@ -21,7 +22,7 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                         tabPanel("Upload Data",
                                  sidebarLayout(
                                    sidebarPanel(
-                                     fileInput("file1", "Choose CSV File"),
+                                     fileInput("file1", "Choose .xlsx File"),
                                      downloadButton("downloadData", "Download Cleaned .xlsx file")
                                    ),
                                    mainPanel(
@@ -230,7 +231,7 @@ server <- function(input, output, session) {
   # Observe event for file upload
   observeEvent(input$file1, {
     if (!is.null(input$file1)) {
-      uploaded_data <- readr::read_csv(input$file1$datapath)
+      uploaded_data <- readxl::read_xlsx(input$file1$datapath)
       
       if (identical(names(uploaded_data), names(raw_data_as400))) {
         cleaned_uploaded_data <- clean_data(uploaded_data)
@@ -294,7 +295,7 @@ server <- function(input, output, session) {
     
     if (!is.null(input$file1)) {
       
-      uploaded_data <- readr::read_csv(input$file1$datapath)
+      uploaded_data <- readxl::read_xlsx(input$file1$datapath)
       
       if (identical(names(uploaded_data), names(raw_data_as400))) {
         
