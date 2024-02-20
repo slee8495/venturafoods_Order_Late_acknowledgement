@@ -62,7 +62,8 @@ clean_data <- function(raw_data_as400) {
                   "Date Acknowledgement Calc." = date_acknowledgement_calc,
                   "Days to acknowledge" = days_to_acknowledge) %>% 
     dplyr::filter(!is.na(OrderDate) & OrderDate != 0) %>% 
-    dplyr::filter(!Customer %in% exceptions_customers$Customer)
+    dplyr::filter(!Customer %in% exceptions_customers$Customer) %>% 
+    dplyr::filter(!stringr::str_detect(CustomerName, fixed("ventura", ignore_case = TRUE)))
   
   
   return(cleaned_data)
