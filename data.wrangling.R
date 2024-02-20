@@ -11,10 +11,11 @@ clean_data <- function(raw_data_as400) {
   
   create.calendar(name='CustomWeekends', weekdays=c('saturday', 'sunday'), holidays=character(0))
   
-  exceptions %>% 
+  exceptions_customers <- exceptions %>% 
     janitor::clean_names() %>% 
     dplyr::rename(Customer = ship_to_number) %>% 
-    dplyr::select(Customer)
+    dplyr::select(Customer) %>% 
+    dplyr::filter(!is.na(Customer))
   
   raw_data_as400[3, ] -> data_info
   raw_data_as400[c(-1:-7, -9:-10), ] -> cleaned_data
@@ -60,7 +61,9 @@ clean_data <- function(raw_data_as400) {
                   "Date acknowledge" = date_acknowledge,
                   "Date Acknowledgement Calc." = date_acknowledgement_calc,
                   "Days to acknowledge" = days_to_acknowledge) %>% 
-    dplyr::filter(!is.na(OrderDate) & OrderDate != 0)
+    dplyr::filter(!is.na(OrderDate) & OrderDate != 0) %>% 
+    dplyr::filter(!Customer %in% exceptions_customers$Customer)
+  
   
   return(cleaned_data)
 }
@@ -77,8 +80,5 @@ data_info <- function() {
 raw_data_as400 <- read_xlsx("as400_data.xlsx")
 exceptions <- read_xlsx("exceptions.xlsx")
 cleaned_default_data <- clean_data(raw_data_as400)
-
-
-
 
 
