@@ -3,10 +3,13 @@ library(openxlsx)
 library(readxl)
 library(writexl)
 library(lubridate)
+library(bizdays)
 
 
 
 clean_data <- function(raw_data_as400) {
+  
+  create.calendar(name='CustomWeekends', weekdays=c('saturday', 'sunday'), holidays=character(0))
   
   raw_data_as400[3, ] -> data_info
   raw_data_as400[c(-1:-7, -9:-10), ] -> cleaned_data
@@ -25,7 +28,7 @@ clean_data <- function(raw_data_as400) {
                   week_number = lubridate::isoweek(order_date),
                   date_acknowledgement_calc = ifelse(is.na(date_acknowledge), as.character(Sys.Date()), as.character(date_acknowledge)),
                   date_acknowledgement_calc = as.Date(date_acknowledgement_calc, format="%Y-%m-%d"),
-                  days_to_acknowledge = ifelse(!is.na(date_acknowledgement_calc) & !is.na(order_date), as.numeric(date_acknowledgement_calc - order_date), "-"),
+                  days_to_acknowledge = ifelse(!is.na(date_acknowledgement_calc) & !is.na(order_date), bizdays(order_date, date_acknowledgement_calc, 'CustomWeekends'), "-"),
                   fail = ifelse(days_to_acknowledge > 2, "Yes", "No")) %>% 
     
     plyr::mutate(`On Time` = ifelse(fail == "Yes", "Not on Time", "On Time")) %>%
