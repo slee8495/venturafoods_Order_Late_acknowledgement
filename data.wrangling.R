@@ -11,6 +11,11 @@ clean_data <- function(raw_data_as400) {
   
   create.calendar(name='CustomWeekends', weekdays=c('saturday', 'sunday'), holidays=character(0))
   
+  exceptions %>% 
+    janitor::clean_names() %>% 
+    dplyr::rename(Customer = ship_to_number) %>% 
+    dplyr::select(Customer)
+  
   raw_data_as400[3, ] -> data_info
   raw_data_as400[c(-1:-7, -9:-10), ] -> cleaned_data
   
@@ -70,6 +75,7 @@ data_info <- function() {
 
 # Default Data 
 raw_data_as400 <- read_xlsx("as400_data.xlsx")
+exceptions <- read_xlsx("exceptions.xlsx")
 cleaned_default_data <- clean_data(raw_data_as400)
 
 
