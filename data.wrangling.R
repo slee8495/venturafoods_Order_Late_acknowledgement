@@ -42,6 +42,11 @@ clean_data <- function(raw_data_as400) {
     
     dplyr::relocate(week_number, .after = order_date) %>% 
     dplyr::mutate(across(-contains("date"), ~ifelse(is.na(.x), "-", .x))) %>% 
+    dplyr::mutate(Year_2 = year(order_date),
+                  Week = sprintf("%04d.%02d", Year_2, week_number),
+                  Week = as.double(Week),
+                  Week = round(Week, 2)) %>% 
+    dplyr::select(-Year_2, -week_number) %>%
     dplyr::rename("Profile owner" = profile_owner,
                   "Profile name" = profile_name,
                   "Enter by" = enter_by,
@@ -53,7 +58,6 @@ clean_data <- function(raw_data_as400) {
                   CustomerName = customer_name,
                   Customer = customer,
                   OrderDate = order_date,
-                  Week = week_number,
                   DeliveryDate = delivery_date,
                   ShipDate = ship_date,
                   "Detail hold code" = detail_hold_code,
