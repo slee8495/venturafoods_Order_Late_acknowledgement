@@ -659,25 +659,29 @@ server <- function(input, output, session) {
     print(p)
   })
   
+  
+  
   output$avgGraph <- renderPlot({
     
     avg_data <- data_to_display() %>%
       filter(OrderDate >= input$dateRange_9[1] & OrderDate <= input$dateRange_9[2]) %>%
       dplyr::filter(`On Time` %in% input$Fail) %>%
-      dplyr::group_by(`OrderDate`) %>%
-      dplyr::mutate(`Days to acknowledge` = as.numeric(`Days to acknowledge`)) %>%
-      dplyr::summarise(
-        Avg_Days_to_acknowledge = mean(`Days to acknowledge`, na.rm = TRUE)
+      mutate(Week = floor_date(OrderDate, unit = "week")) %>%
+      group_by(Week) %>%
+      mutate(`Days to acknowledge` = as.numeric(`Days to acknowledge`)) %>%
+      summarise(
+        Avg_Days_to_acknowledge = mean(`Days to acknowledge`, na.rm = TRUE),
+        .groups = 'drop'
       ) %>%
-      tidyr::gather(key = "Metric", value = "Value", -`OrderDate`)
+      tidyr::gather(key = "Metric", value = "Value", -Week)
     
-    avg_data$`OrderDate` <- factor(avg_data$`OrderDate`, levels = unique(avg_data$`OrderDate`))
+    avg_data$Week <- factor(avg_data$Week, levels = unique(avg_data$Week))
     
-    ggplot(avg_data, aes(x = OrderDate, y = Value, color = Metric, group = Metric)) +
+    p <- ggplot(avg_data, aes(x = Week, y = Value, color = Metric, group = Metric)) +
       geom_line(size = 1) +
       geom_text(aes(label = sprintf("%d", round(Value))), vjust = -0.5, size = 5, fontface = "bold", color = "black") +
       geom_hline(yintercept = 2, linetype = "dashed", color = "lightgreen", face = "bold", size = 2) +
-      annotate("text", x = last(avg_data$OrderDate), y = 2, label = "Target: 2 days", hjust = 1, vjust = 2, color = "black", face = "bold", size = 5) +
+      annotate("text", x = last(avg_data$Week), y = 2, label = "Target: 2 days", hjust = 1, vjust = 2, color = "black", face = "bold", size = 5) +
       ylim(0, max(avg_data$Value, na.rm = TRUE) + 1) +  
       theme_classic() +
       labs(y = "Days", x = "", color = "Metric") +
@@ -688,10 +692,12 @@ server <- function(input, output, session) {
         axis.title.y = element_text(size = 16, face = "bold"),
         legend.title = element_text(size = 16, face = "bold"),
         legend.text = element_text(size = 14, face = "bold"),
-        legend.key.size = unit(1.5, "cm") 
-      )
+        legend.key.size = unit(1.5, "cm")
+      ) +
+      scale_x_discrete(labels = function(x) format(as.Date(x), "%V"))
+    
+    print(p)
   })
-  
   
   
   
