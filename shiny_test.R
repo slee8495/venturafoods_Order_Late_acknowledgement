@@ -579,14 +579,26 @@ server <- function(input, output, session) {
   })
   
   
+  stacked_bar_data <- data_to_display() 
+  
+  stacked_bar_data$OrderDate <- as.Date(stacked_bar_data$OrderDate)
+  stacked_bar_data$FirstMonday <- stacked_bar_data$OrderDate - (wday(stacked_bar_data$OrderDate) - 2)
+  stacked_bar_data$FirstMonday[stacked_bar_data$wday(stacked_bar_data$OrderDate) == 1] <- stacked_bar_data$OrderDate - 6
+  stacked_bar_data <- stacked_bar_data[!is.na(stacked_bar_data$FirstMonday) & is.finite(stacked_bar_data$FirstMonday),]
+  
+  
   
   output$stackedBar <- renderPlot({
-    bar_data <- data_to_display() %>%
+    bar_data <- stacked_bar_data %>%
       filter(Week %in% input$weekFilter) %>%  
       dplyr::filter(!is.na(Week)) %>%
       group_by(Week, `On Time`) %>%
       summarise(Count = n()) %>%
       ungroup()
+    
+    
+  
+    
     
     
     bar_data$Week <- factor(bar_data$Week, levels = unique(bar_data$Week), ordered = TRUE)
@@ -608,7 +620,10 @@ server <- function(input, output, session) {
     
     
     
-  
+    bar_data$Week <- as.Date(cut(lubridate::ymd(bar_data$OrderDate) + 
+                                   (1 - lubridate::wday(lubridate::ymd(bar_data$OrderDate))), "week"))
+    
+    
     ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Percentage, fill = `On Time`)) +
       ggplot2::geom_bar(stat = "identity", position = "stack") +
       ggplot2::geom_text(aes(label = sprintf("%.1f%%", Percentage), y = CumulativePercentage), 
@@ -626,6 +641,9 @@ server <- function(input, output, session) {
         legend.title = ggplot2::element_text(face = "bold", size = 16)
       ) +
       ggplot2::scale_fill_manual(values = c(`Not on Time` = "#FF9999", `On Time` = "#66B2FF"))
+    
+    
+
     
   })
   
