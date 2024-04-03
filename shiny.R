@@ -700,6 +700,7 @@ server <- function(input, output, session) {
     avg_data <- avg_data %>%
       mutate(Week = as.Date(Week))
     
+    
     p <- ggplot(avg_data, aes(x = Week, y = Value, color = Metric, group = Metric)) +
       geom_line(size = 1) +
       geom_text(aes(label = sprintf("%d", round(Value))), vjust = -0.5, size = 5, fontface = "bold", color = "black") +
