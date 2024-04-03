@@ -153,11 +153,9 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                             br(),
                                             fluidRow(
                                               column(width = 12,
-                                                     pickerInput("weekFilter", "Week:",
-                                                                 choices = sort(unique(cleaned_default_data$Week)),
-                                                                 selected = unique(cleaned_default_data$Week),
-                                                                 options = list(`actions-box` = TRUE), 
-                                                                 multiple = TRUE)
+                                                     dateRangeInput("dateRange_10", "Order Date:",
+                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
                                               )
                                             ),
                                             br(),
@@ -263,6 +261,9 @@ server <- function(input, output, session) {
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
         updateDateRangeInput(session, "dateRange_9", 
+                             start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
+                             end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
+        updateDateRangeInput(session, "dateRange_10", 
                              start = min(cleaned_uploaded_data$OrderDate, na.rm = TRUE), 
                              end = max(cleaned_uploaded_data$OrderDate, na.rm = TRUE))
         
@@ -580,26 +581,37 @@ server <- function(input, output, session) {
   
   
   
+  
+  
+  
+  
+  
+  
+  
+  # Function to convert "year.week_number" to the Date of the first Monday of that week
+  getMondayDate <- function(year_week) {
+    year <- as.numeric(sub("\\..*", "", year_week))
+    week <- as.numeric(sub(".*\\.", "", year_week))
+    as.Date(paste(year, week, 1, sep = "-"), format="%Y-%U-%u")
+  }
+  
   output$stackedBar <- renderPlot({
     bar_data <- data_to_display() %>%
-      filter(Week %in% input$weekFilter) %>%  
+      filter(OrderDate >= input$dateRange_10[1] & OrderDate <= input$dateRange_10[2]) %>%
       dplyr::filter(!is.na(Week)) %>%
       group_by(Week, `On Time`) %>%
-      summarise(Count = n()) %>%
+      summarise(Count = n(), .groups = 'drop') %>%
       ungroup()
     
     
-    bar_data$Week <- factor(bar_data$Week, levels = unique(bar_data$Week), ordered = TRUE)
-    
+    # # Apply the function to the Week column
+    bar_data$Week <- as.Date(sapply(as.character(bar_data$Week), getMondayDate), origin="1970-01-01")
     
     total_counts <- bar_data %>% group_by(Week) %>% summarise(Total = sum(Count))
     
-    
     bar_data <- merge(bar_data, total_counts, by = "Week")
     
-    
     bar_data$Percentage <- (bar_data$Count / bar_data$Total) * 100
-    
     
     bar_data <- bar_data %>%
       arrange(Week, desc(`On Time`)) %>%
@@ -608,23 +620,28 @@ server <- function(input, output, session) {
     
     ggplot2::ggplot(bar_data, ggplot2::aes(x = Week, y = Percentage, fill = `On Time`)) +
       ggplot2::geom_bar(stat = "identity", position = "stack") +
-      ggplot2::geom_text(aes(label = sprintf("%.1f%%", Percentage), y = CumulativePercentage), 
+      ggplot2::geom_text(aes(label = sprintf("%.1f%%", Percentage), y = CumulativePercentage),
                          size = 6, fontface = "bold", color = "black") +
       ggplot2::labs(y = "Percentage (%)", x = "", fill = "On Time",
                     title = "Fail Distribution by Week") +
       ggplot2::theme_classic() +
       ggplot2::theme(
-        axis.text.x = ggplot2::element_text(face = "bold", size = 12),
+        axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.5, face = "bold", size = 12),
         axis.text.y = ggplot2::element_text(face = "bold", size = 12),
         axis.title.x = ggplot2::element_text(face = "bold", size = 14),
         axis.title.y = ggplot2::element_text(face = "bold", size = 14),
         legend.text = ggplot2::element_text(face = "bold", size = 16),
-        plot.title = ggplot2::element_text(face = "bold", size = 18, family = "Your_Font_Family"),
+        plot.title = ggplot2::element_text(face = "bold", size = 18),
         legend.title = ggplot2::element_text(face = "bold", size = 16)
       ) +
+      ggplot2::scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 week") +
       ggplot2::scale_fill_manual(values = c(`Not on Time` = "#FF9999", `On Time` = "#66B2FF"))
-    
   })
+  
+  
+  
+  
+  
   
   
   
@@ -637,6 +654,9 @@ server <- function(input, output, session) {
       ungroup()
     
     line_data$Week <- factor(line_data$Week, levels = unique(line_data$Week))
+    
+    line_data <- line_data %>%
+      mutate(Week = as.Date(Week))
     
     p <- ggplot2::ggplot(line_data, ggplot2::aes(x = Week, y = Count, color = `On Time`, group = `On Time`)) +
       ggplot2::geom_line(size = 1) +
@@ -654,7 +674,7 @@ server <- function(input, output, session) {
         legend.key.size = unit(1.5, "cm"),
         plot.title = ggplot2::element_text(face = "bold", size = 18, family = "Your_Font_Family")) +
       ggplot2::scale_color_manual(values = c(`Not on Time` = "#FF9999", `On Time` = "#66B2FF")) +
-      ggplot2::scale_x_discrete(labels = function(x) format(as.Date(x), "%V"))
+      scale_x_date(date_breaks = "1 week", date_labels = "%Y-%m-%d")
     
     print(p)
   })
@@ -677,6 +697,9 @@ server <- function(input, output, session) {
     
     avg_data$Week <- factor(avg_data$Week, levels = unique(avg_data$Week))
     
+    avg_data <- avg_data %>%
+      mutate(Week = as.Date(Week))
+    
     p <- ggplot(avg_data, aes(x = Week, y = Value, color = Metric, group = Metric)) +
       geom_line(size = 1) +
       geom_text(aes(label = sprintf("%d", round(Value))), vjust = -0.5, size = 5, fontface = "bold", color = "black") +
@@ -694,7 +717,7 @@ server <- function(input, output, session) {
         legend.text = element_text(size = 14, face = "bold"),
         legend.key.size = unit(1.5, "cm")
       ) +
-      scale_x_discrete(labels = function(x) format(as.Date(x), "%V"))
+      scale_x_date(date_breaks = "1 week", date_labels = "%Y-%m-%d")
     
     print(p)
   })
