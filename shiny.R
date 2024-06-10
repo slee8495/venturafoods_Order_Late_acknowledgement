@@ -182,27 +182,27 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                               column(width = 12,
                                                      plotOutput("lineGraph", height = "800px"))
                                             )
-                                   ),
-                                   tabPanel("Order Date Average Graph",
-                                            br(),
-                                            br(),
-                                            fluidRow(
-                                              column(width = 12,
-                                                     pickerInput("Fail", "Select Fail Status:", 
-                                                                 choices = unique(cleaned_default_data$`On Time`),
-                                                                 selected = unique(cleaned_default_data$`On Time`[2]),
-                                                                 multiple = TRUE),
-                                                     dateRangeInput("dateRange_9", "Order Date:",
-                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
-                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE)))
-                                            ),
-                                            br(),
-                                            br(),
-                                            fluidRow(
-                                              column(width = 12,
-                                                     plotOutput("avgGraph", height = "800px"))  
-                                            )
                                    )
+                                   # tabPanel("Order Date Average Graph",
+                                   #          br(),
+                                   #          br(),
+                                   #          fluidRow(
+                                   #            column(width = 12,
+                                   #                   pickerInput("Fail", "Select Fail Status:", 
+                                   #                               choices = unique(cleaned_default_data$`On Time`),
+                                   #                               selected = unique(cleaned_default_data$`On Time`[2]),
+                                   #                               multiple = TRUE),
+                                   #                   dateRangeInput("dateRange_9", "Order Date:",
+                                   #                                  start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
+                                   #                                  end = max(cleaned_default_data$OrderDate, na.rm = TRUE)))
+                                   #          ),
+                                   #          br(),
+                                   #          br(),
+                                   #          fluidRow(
+                                   #            column(width = 12,
+                                   #                   plotOutput("avgGraph", height = "800px"))  
+                                   #          )
+                                   # )
                                    
                                  )
                         )
