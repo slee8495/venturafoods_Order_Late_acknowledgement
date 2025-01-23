@@ -165,44 +165,8 @@ ui <- shiny::navbarPage("Order Late Acknowledgement",
                                                      plotOutput("stackedBar"))
                                             )
                                    )
-                                   ,
-                                   tabPanel("Line Graph",
-                                            br(),
-                                            br(),
-                                            fluidRow(
-                                              column(width = 12,
-                                                     dateRangeInput("dateRange_8", "Order Date:",
-                                                                    start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
-                                                                    end = max(cleaned_default_data$OrderDate, na.rm = TRUE))
-                                              )
-                                            ),
-                                            br(),
-                                            br(),
-                                            fluidRow(
-                                              column(width = 12,
-                                                     plotOutput("lineGraph", height = "800px"))
-                                            )
-                                   )
-                                   # tabPanel("Order Date Average Graph",
-                                   #          br(),
-                                   #          br(),
-                                   #          fluidRow(
-                                   #            column(width = 12,
-                                   #                   pickerInput("Fail", "Select Fail Status:", 
-                                   #                               choices = unique(cleaned_default_data$`On Time`),
-                                   #                               selected = unique(cleaned_default_data$`On Time`[2]),
-                                   #                               multiple = TRUE),
-                                   #                   dateRangeInput("dateRange_9", "Order Date:",
-                                   #                                  start = min(cleaned_default_data$OrderDate, na.rm = TRUE), 
-                                   #                                  end = max(cleaned_default_data$OrderDate, na.rm = TRUE)))
-                                   #          ),
-                                   #          br(),
-                                   #          br(),
-                                   #          fluidRow(
-                                   #            column(width = 12,
-                                   #                   plotOutput("avgGraph", height = "800px"))  
-                                   #          )
-                                   # )
+                                   
+                    
                                    
                                  )
                         )
@@ -640,45 +604,7 @@ server <- function(input, output, session) {
   
   
   
-  
-  
-  
-  
-  
-  output$lineGraph <- renderPlot({
-    line_data <- data_to_display() %>%
-      filter(OrderDate >= input$dateRange_8[1] & OrderDate <= input$dateRange_8[2]) %>%
-      mutate(Week = floor_date(OrderDate, unit = "week")) %>%
-      group_by(Week, `On Time`) %>%
-      summarise(Count = n(), .groups = 'drop') %>%
-      ungroup()
-    
-    line_data$Week <- factor(line_data$Week, levels = unique(line_data$Week))
-    
-    line_data <- line_data %>%
-      mutate(Week = as.Date(Week))
-    
-    p <- ggplot2::ggplot(line_data, ggplot2::aes(x = Week, y = Count, color = `On Time`, group = `On Time`)) +
-      ggplot2::geom_line(size = 1) +
-      ggplot2::geom_text(aes(label = Count), vjust = -0.5, size = 5, fontface = "bold") +  
-      ggplot2::theme_classic() +
-      ggplot2::labs(title = "Fail Distribution by number of Customers over Time", y = "Number of Customers", x = "", color = "Fail Status") +
-      ggplot2::ylim(0, max(line_data$Count, na.rm = TRUE) + 1) +  
-      ggplot2::theme(
-        axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
-        axis.text.y = ggplot2::element_text(size = 14, face = "bold"),
-        axis.title.x = ggplot2::element_text(size = 16, face = "bold"),
-        axis.title.y = ggplot2::element_text(size = 16, face = "bold"),
-        legend.title = ggplot2::element_text(size = 16, face = "bold"),
-        legend.text = ggplot2::element_text(size = 14, face = "bold"),
-        legend.key.size = unit(1.5, "cm"),
-        plot.title = ggplot2::element_text(face = "bold", size = 18, family = "Your_Font_Family")) +
-      ggplot2::scale_color_manual(values = c(`Not on Time` = "#FF9999", `On Time` = "#66B2FF")) +
-      scale_x_date(date_breaks = "1 week", date_labels = "%Y-%m-%d")
-    
-    print(p)
-  })
-  
+
   
   
   output$avgGraph <- renderPlot({
